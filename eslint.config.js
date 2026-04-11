@@ -4,9 +4,9 @@ const expoConfig = require('eslint-config-expo/flat');
 const eslintConfigPrettier = require('eslint-config-prettier/flat');
 
 module.exports = defineConfig([
-  expoConfig,
-  {
-    ignores: ['dist/*'],
-  },
-  eslintConfigPrettier,
+    expoConfig,
+    {
+        ignores: ['dist/*'],
+    },
+    eslintConfigPrettier,
 ]);
