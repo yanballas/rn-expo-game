@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { LoremBlock } from '@/components/lorem-block';
+import { LoremBlock } from '@components/lorem-block';
 
 export default function Index() {
     return (

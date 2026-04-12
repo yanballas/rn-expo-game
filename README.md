@@ -1,50 +1,45 @@
-# Welcome to your Expo app 👋
+# rn-expo-game
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo (React Native) app. **Single root `package.json` and `package-lock.json`** for the whole repository: install and run commands always from the repo root.
 
-## Get started
+## Layout
 
-1. Install dependencies
+- **`client/`** — application source: `app/` (Expo Router), `assets/`, `components/`, `store/`, `storage/`, `scripts/`.
+- **Repo root** — Expo config (`app.json`), TypeScript (`tsconfig.json`), ESLint, Prettier, and npm manifest.
 
-    ```bash
-    npm install
-    ```
+When you add a **backend** later, keep the same single root manifest: add server dependencies to this `package.json` and put server code in something like `backend/` (no extra lockfile).
 
-2. Start the app
+## Path aliases
 
-    ```bash
-    npx expo start
-    ```
+Imports use explicit prefixes (resolved via `tsconfig.json` and Metro `tsconfigPaths`):
 
-In the output, you'll find options to open the app in a
+- `@assets/...` → `client/assets/...`
+- `@components/...` → `client/components/...`
+- `@store/...` → `client/store/...`
+- `@storage/...` → `client/storage/...`
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Example: `import { LoremBlock } from '@components/lorem-block';`
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Commands
 
-## Get a fresh project
+From the repository root:
 
-When you're ready, run:
+```bash
+npm install
+npm start
+```
+
+Other scripts: `npm run android`, `npm run ios`, `npm run web`, `npm run lint`, `npm run format`, `npm run reset-project`.
+
+## Fresh starter layout
+
+To move current app code aside and create a blank `client/app`:
 
 ```bash
 npm run reset-project
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
 ## Learn more
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo documentation](https://docs.expo.dev/)
+- [Expo Router](https://docs.expo.dev/router/introduction/)

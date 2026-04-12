@@ -2,7 +2,7 @@
 
 /**
  * This script is used to reset the project to a blank state.
- * It deletes or moves the /app, /components, /hooks, /scripts, and /constants directories to /app-example based on user input and creates a new /app directory with an index.tsx and _layout.tsx file.
+ * It deletes or moves client app directories to /app-example based on user input and creates a new client/app directory.
  * You can remove the `reset-project` script from package.json and safely delete this file after running it.
  */
 
@@ -10,11 +10,12 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-const root = process.cwd();
-const oldDirs = ['app', 'components', 'hooks', 'constants', 'scripts'];
+const repoRoot = process.cwd();
+const clientRoot = path.join(repoRoot, 'client');
+const oldDirs = ['app', 'components', 'hooks', 'constants', 'store', 'storage'];
 const exampleDir = 'app-example';
 const newAppDir = 'app';
-const exampleDirPath = path.join(root, exampleDir);
+const exampleDirPath = path.join(repoRoot, exampleDir);
 
 const indexContent = `import { Text, View } from "react-native";
 
@@ -27,7 +28,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
+      <Text>Edit client/app/index.tsx to edit this screen.</Text>
     </View>
   );
 }
@@ -48,46 +49,41 @@ const rl = readline.createInterface({
 const moveDirectories = async userInput => {
     try {
         if (userInput === 'y') {
-            // Create the app-example directory
             await fs.promises.mkdir(exampleDirPath, { recursive: true });
             console.log(`📁 /${exampleDir} directory created.`);
         }
 
-        // Move old directories to new app-example directory or delete them
         for (const dir of oldDirs) {
-            const oldDirPath = path.join(root, dir);
+            const oldDirPath = path.join(clientRoot, dir);
             if (fs.existsSync(oldDirPath)) {
                 if (userInput === 'y') {
-                    const newDirPath = path.join(root, exampleDir, dir);
+                    const newDirPath = path.join(exampleDirPath, dir);
                     await fs.promises.rename(oldDirPath, newDirPath);
-                    console.log(`➡️ /${dir} moved to /${exampleDir}/${dir}.`);
+                    console.log(`➡️ /client/${dir} moved to /${exampleDir}/${dir}.`);
                 } else {
                     await fs.promises.rm(oldDirPath, { recursive: true, force: true });
-                    console.log(`❌ /${dir} deleted.`);
+                    console.log(`❌ /client/${dir} deleted.`);
                 }
             } else {
-                console.log(`➡️ /${dir} does not exist, skipping.`);
+                console.log(`➡️ /client/${dir} does not exist, skipping.`);
             }
         }
 
-        // Create new /app directory
-        const newAppDirPath = path.join(root, newAppDir);
+        const newAppDirPath = path.join(clientRoot, newAppDir);
         await fs.promises.mkdir(newAppDirPath, { recursive: true });
-        console.log('\n📁 New /app directory created.');
+        console.log('\n📁 New /client/app directory created.');
 
-        // Create index.tsx
         const indexPath = path.join(newAppDirPath, 'index.tsx');
         await fs.promises.writeFile(indexPath, indexContent);
-        console.log('📄 app/index.tsx created.');
+        console.log('📄 client/app/index.tsx created.');
 
-        // Create _layout.tsx
         const layoutPath = path.join(newAppDirPath, '_layout.tsx');
         await fs.promises.writeFile(layoutPath, layoutContent);
-        console.log('📄 app/_layout.tsx created.');
+        console.log('📄 client/app/_layout.tsx created.');
 
         console.log('\n✅ Project reset complete. Next steps:');
         console.log(
-            `1. Run \`npx expo start\` to start a development server.\n2. Edit app/index.tsx to edit the main screen.${
+            `1. Run \`npx expo start\` to start a development server.\n2. Edit client/app/index.tsx to edit the main screen.${
                 userInput === 'y'
                     ? `\n3. Delete the /${exampleDir} directory when you're done referencing it.`
                     : ''
