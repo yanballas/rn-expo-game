@@ -4,6 +4,7 @@
         "strict": true,
         "baseUrl": ".",
         "paths": {
+            "@/*": ["./*"],
             "@assets/*": ["./client/assets/*"],
             "@components/*": ["./client/components/*"],
             "@store/*": ["./client/store/*"],
@@ -13,6 +14,7 @@
     "include": [
         "client/**/*.ts",
         "client/**/*.tsx",
+        "utils/**/*.ts",
         ".expo/types/**/*.ts",
         "expo-env.d.ts"
     ]

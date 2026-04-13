@@ -1,11 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 
-import { LoremBlock } from '@components/lorem-block';
+import { FullCard } from '@/client/components/Card/FullCard';
 
 export default function Index() {
     return (
         <View style={styles.container}>
-            <LoremBlock />
+            <FullCard card={{ rank: 'A', suit: 'hearts' }} />
         </View>
     );
 }
