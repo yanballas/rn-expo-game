@@ -1,24 +1,10 @@
-export const cardRanks = [
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    'J',
-    'Q',
-    'K',
-    'A',
-] as const;
-export const cardSuits = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
+export const cardRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+export const cardSuits = ['hearts', 'diamonds', 'clubs', 'spades'];
 
 export const colors = {
     red: '#FF0000',
     black: '#000000',
-} as const;
+};
 
 export const cardStyles = {
     width: 120,
@@ -29,3 +15,8 @@ export const cardStyles = {
     padding: 16,
     overflow: 'hidden',
 } as const;
+
+export const flipTransition = {
+    type: 'timing' as const,
+    duration: 800,
+};

@@ -47,3 +47,7 @@ app-example
 
 # vs code extensions
 .vscode/
+
+# codex
+
+.codex
