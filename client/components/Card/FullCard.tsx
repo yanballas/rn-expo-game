@@ -1,5 +1,5 @@
-import { MotiView } from 'moti';
 import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { BackCard } from './BackCard';
 import { FrontCard } from './FrontCard';
@@ -7,30 +7,46 @@ import { FrontCard } from './FrontCard';
 import { cardStyles, flipTransition } from '@/utils/constants';
 import { AnimatedCardFace as AnimatedCardFaceType, FullCard as FullCardType } from '@/utils/types';
 
+const rotatePositions = {
+    front: {
+        start: '0deg',
+        end: '180deg',
+    },
+    back: {
+        start: '-180deg',
+        end: '0deg',
+    },
+};
+
 function AnimatedCardFace({ children, isVisible, rotateY, style }: AnimatedCardFaceType) {
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ perspective: 1000 }, { rotateY: withTiming(rotateY, { duration: flipTransition.duration }) }],
+        };
+    }, [rotateY]);
+
     return (
-        <MotiView
-            animate={{
-                transform: [{ perspective: 1000 }, { rotateY }],
-            }}
-            pointerEvents={isVisible ? 'auto' : 'none'}
-            style={[styles.cardFace, style]}
-            transition={flipTransition}
-        >
+        <Animated.View pointerEvents={isVisible ? 'auto' : 'none'} style={[styles.cardFace, style, animatedStyle]}>
             {children}
-        </MotiView>
+        </Animated.View>
     );
 }
 
 export function FullCard({ card: { rank, suit, isFlipped = true } }: { card: FullCardType }) {
-    const showFront = isFlipped;
-
     return (
         <View style={styles.container}>
-            <AnimatedCardFace isVisible={showFront} rotateY={showFront ? '0deg' : '180deg'} style={styles.cardFront}>
+            <AnimatedCardFace
+                isVisible={isFlipped}
+                rotateY={isFlipped ? rotatePositions.front.start : rotatePositions.front.end}
+                style={styles.cardFront}
+            >
                 <FrontCard card={{ rank, suit }} />
             </AnimatedCardFace>
-            <AnimatedCardFace isVisible={!showFront} rotateY={showFront ? '-180deg' : '0deg'} style={styles.cardBack}>
+            <AnimatedCardFace
+                isVisible={!isFlipped}
+                rotateY={isFlipped ? rotatePositions.back.start : rotatePositions.back.end}
+                style={styles.cardBack}
+            >
                 <BackCard />
             </AnimatedCardFace>
         </View>
