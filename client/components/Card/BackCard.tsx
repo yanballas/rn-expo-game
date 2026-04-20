@@ -1,4 +1,4 @@
-import { cardStyles } from '@/utils/constants';
+import { cardStyles } from '@/client/utils/constants';
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 

@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 
-import { cardRanks, cardSuits } from '@/utils/constants';
+import { cardRanks, cardSuits } from '@utils/constants';
 
 export interface FrontCard {
     rank: (typeof cardRanks)[number];

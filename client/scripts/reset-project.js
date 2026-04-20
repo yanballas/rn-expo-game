@@ -84,9 +84,7 @@ const moveDirectories = async userInput => {
         console.log('\n✅ Project reset complete. Next steps:');
         console.log(
             `1. Run \`npx expo start\` to start a development server.\n2. Edit client/app/index.tsx to edit the main screen.${
-                userInput === 'y'
-                    ? `\n3. Delete the /${exampleDir} directory when you're done referencing it.`
-                    : ''
+                userInput === 'y' ? `\n3. Delete the /${exampleDir} directory when you're done referencing it.` : ''
             }`,
         );
     } catch (error) {
@@ -94,15 +92,12 @@ const moveDirectories = async userInput => {
     }
 };
 
-rl.question(
-    'Do you want to move existing files to /app-example instead of deleting them? (Y/n): ',
-    answer => {
-        const userInput = answer.trim().toLowerCase() || 'y';
-        if (userInput === 'y' || userInput === 'n') {
-            moveDirectories(userInput).finally(() => rl.close());
-        } else {
-            console.log("❌ Invalid input. Please enter 'Y' or 'N'.");
-            rl.close();
-        }
-    },
-);
+rl.question('Do you want to move existing files to /app-example instead of deleting them? (Y/n): ', answer => {
+    const userInput = answer.trim().toLowerCase() || 'y';
+    if (userInput === 'y' || userInput === 'n') {
+        moveDirectories(userInput).finally(() => rl.close());
+    } else {
+        console.log("❌ Invalid input. Please enter 'Y' or 'N'.");
+        rl.close();
+    }
+});

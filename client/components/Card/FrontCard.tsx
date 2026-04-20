@@ -1,8 +1,14 @@
-import { Image } from 'expo-image';
+import type { ComponentType } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { SvgProps } from 'react-native-svg';
 
-import { cardStyles, colors } from '@/utils/constants';
-import { FrontCard as FrontCardType } from '@/utils/types';
+import Clubs from '../../assets/svg/clubs.svg';
+import Diamonds from '../../assets/svg/diamonds.svg';
+import Hearts from '../../assets/svg/hearts.svg';
+import Spades from '../../assets/svg/spades.svg';
+
+import { cardStyles, colors } from '@/client/utils/constants';
+import { FrontCard as FrontCardType } from '@/client/utils/types';
 
 const rankColorBySuit: Record<FrontCardType['suit'], string> = {
     hearts: colors.red,
@@ -11,20 +17,21 @@ const rankColorBySuit: Record<FrontCardType['suit'], string> = {
     spades: colors.black,
 };
 
-const suitSources = {
-    hearts: require('@/client/assets/svg/hearts.svg'),
-    diamonds: require('@/client/assets/svg/diamonds.svg'),
-    clubs: require('@/client/assets/svg/clubs.svg'),
-    spades: require('@/client/assets/svg/spades.svg'),
+const suitIcons: Record<FrontCardType['suit'], ComponentType<SvgProps>> = {
+    hearts: Hearts,
+    diamonds: Diamonds,
+    clubs: Clubs,
+    spades: Spades,
 };
 
 export function FrontCard({ card: { rank, suit } }: { card: FrontCardType }) {
+    const SuitIcon = suitIcons[suit];
     return (
         <View style={styles.container}>
             <View style={styles.content}>
                 <Text style={[styles.rank, { color: rankColorBySuit[suit] }]}>{rank}</Text>
                 <View style={styles.suitContainer}>
-                    <Image source={suitSources[suit]} style={styles.suit} />
+                    <SuitIcon width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
                 </View>
             </View>
         </View>
@@ -54,10 +61,5 @@ const styles = StyleSheet.create({
         width: 24,
         flexShrink: 0,
         height: 24,
-    },
-    suit: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
     },
 });

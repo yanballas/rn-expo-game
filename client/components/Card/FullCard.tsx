@@ -4,8 +4,8 @@ import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { BackCard } from './BackCard';
 import { FrontCard } from './FrontCard';
 
-import { cardStyles, flipTransition } from '@/utils/constants';
-import { AnimatedCardFace as AnimatedCardFaceType, FullCard as FullCardType } from '@/utils/types';
+import { cardStyles, flipTransition } from '@/client/utils/constants';
+import { AnimatedCardFace as AnimatedCardFaceType, FullCard as FullCardType } from '@/client/utils/types';
 
 const rotatePositions = {
     front: {

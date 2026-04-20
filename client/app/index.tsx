@@ -1,21 +1,52 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Asset } from 'expo-asset';
+import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { FullCard } from '@/client/components/Card/FullCard';
+import { useEffect, useState } from 'react';
 
-export default function Index() {
-    const [isFlipped, setIsFlipped] = useState(true);
+import { imageAssets } from '@/client/utils/asset.list';
 
-    const handleAnimatePress = () => {
-        setIsFlipped(currentValue => !currentValue);
-    };
+export default function LoadingScreen() {
+    const router = useRouter();
+    const [loadingText, setLoadingText] = useState('Loading...');
+
+    useEffect(() => {
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
+
+        const loadAssets = async () => {
+            try {
+                setLoadingText('Loading assets...');
+                await Asset.loadAsync(imageAssets);
+
+                if (isMounted) {
+                    setLoadingText('Redirecting to menu...');
+                    router.replace({ pathname: '/menu' });
+                }
+            } catch (error) {
+                console.error('Failed to load assets:', error);
+                if (isMounted) {
+                    setLoadingText('Retrying...');
+                    setTimeout(loadAssets, 1000);
+                }
+            }
+        };
+
+        timeoutId = setTimeout(async () => {
+            await SplashScreen.hideAsync();
+            loadAssets();
+        }, 3000);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
+    }, [router]);
 
     return (
         <View style={styles.container}>
-            <FullCard card={{ rank: 'A', suit: 'hearts', isFlipped }} />
-            <Pressable onPress={handleAnimatePress} style={styles.button}>
-                <Text style={styles.buttonText}>Flip card</Text>
-            </Pressable>
+            <Text style={styles.text}>{loadingText}</Text>
         </View>
     );
 }
@@ -23,20 +54,12 @@ export default function Index() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 24,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 24,
+        backgroundColor: '#fff',
     },
-    button: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: '#1f2937',
-    },
-    buttonText: {
-        color: '#ffffff',
-        fontSize: 16,
+    text: {
+        fontSize: 18,
         fontWeight: '600',
     },
 });
