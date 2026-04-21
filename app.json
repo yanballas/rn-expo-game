@@ -11,6 +11,7 @@
         "ios": {
             "supportsTablet": true
         },
+        "backgroundColor": "#272904",
         "android": {
             "adaptiveIcon": {
                 "backgroundColor": "#E6F4FE",
@@ -33,9 +34,9 @@
                     "image": "./client/assets/images/splash-icon.png",
                     "imageWidth": 200,
                     "resizeMode": "contain",
-                    "backgroundColor": "#ffffff",
+                    "backgroundColor": "#272904",
                     "dark": {
-                        "backgroundColor": "#000000"
+                        "backgroundColor": "#272904"
                     }
                 }
             ]

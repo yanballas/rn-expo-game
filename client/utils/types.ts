@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import type { ImageContentFit } from 'expo-image';
+import { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 
 import { cardRanks, cardSuits } from '@utils/constants';
 
@@ -18,3 +19,8 @@ export interface AnimatedCardFace {
 export interface FullCard extends FrontCard {
     isFlipped?: boolean;
 }
+
+export type BackgroundProps = {
+    source: ImageSourcePropType;
+    contentFit?: ImageContentFit;
+};

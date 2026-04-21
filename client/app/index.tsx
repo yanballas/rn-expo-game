@@ -1,11 +1,18 @@
 import { Asset } from 'expo-asset';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useEffect, useState } from 'react';
 
+import { Background } from '@/client/components/Background';
+
 import { imageAssets } from '@/client/utils/asset.list';
+
+import bgLoadingPng from '@/client/assets/images/background/bg_loading.png';
+import logoPng from '@/client/assets/images/items/logo.png';
+import { colors } from '@/client/utils/constants';
 
 export default function LoadingScreen() {
     const router = useRouter();
@@ -46,6 +53,8 @@ export default function LoadingScreen() {
 
     return (
         <View style={styles.container}>
+            <Background source={bgLoadingPng} />
+            <Image source={logoPng} style={styles.logo} contentFit="contain" />
             <Text style={styles.text}>{loadingText}</Text>
         </View>
     );
@@ -53,10 +62,16 @@ export default function LoadingScreen() {
 
 const styles = StyleSheet.create({
     container: {
+        position: 'relative',
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        gap: 24,
+        backgroundColor: colors.background,
+    },
+    logo: {
+        width: 310,
+        height: 135,
     },
     text: {
         fontSize: 18,

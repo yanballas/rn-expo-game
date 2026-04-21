@@ -10,6 +10,10 @@ import Spades from '../../assets/svg/spades.svg';
 import { cardStyles, colors } from '@/client/utils/constants';
 import { FrontCard as FrontCardType } from '@/client/utils/types';
 
+import { Background } from '@/client/components/Background';
+
+import bgCardPng from '@/client/assets/images/card/bg_card.png';
+
 const rankColorBySuit: Record<FrontCardType['suit'], string> = {
     hearts: colors.red,
     diamonds: colors.red,
@@ -28,6 +32,7 @@ export function FrontCard({ card: { rank, suit } }: { card: FrontCardType }) {
     const SuitIcon = suitIcons[suit];
     return (
         <View style={styles.container}>
+            <Background source={bgCardPng} />
             <View style={styles.content}>
                 <Text style={[styles.rank, { color: rankColorBySuit[suit] }]}>{rank}</Text>
                 <View style={styles.suitContainer}>
@@ -40,13 +45,13 @@ export function FrontCard({ card: { rank, suit } }: { card: FrontCardType }) {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: 'white',
+        position: 'relative',
         width: cardStyles.width,
         height: cardStyles.height,
         borderRadius: cardStyles.borderRadius,
         borderWidth: cardStyles.borderWidth,
         borderColor: cardStyles.borderColor,
-        padding: cardStyles.padding,
+        overflow: cardStyles.overflow,
     },
     content: {
         flexDirection: 'row',

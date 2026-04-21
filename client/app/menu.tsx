@@ -2,11 +2,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
+import { Background } from '@/client/components/Background';
+
+import bgMainPng from '@/client/assets/images/background/bg_main.png';
+import { colors } from '@/client/utils/constants';
+
 export default function MenuScreen() {
     const router = useRouter();
 
     return (
         <View style={styles.container}>
+            <Background source={bgMainPng} />
             <Text style={styles.title}>Blackjack Game</Text>
             <View style={styles.buttonsContainer}>
                 <Pressable style={styles.button} onPress={() => router.push({ pathname: '/game' })}>
@@ -22,11 +28,11 @@ export default function MenuScreen() {
 
 const styles = StyleSheet.create({
     container: {
+        position: 'relative',
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        padding: 20,
+        backgroundColor: colors.background,
     },
     title: {
         fontSize: 24,

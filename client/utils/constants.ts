@@ -1,6 +1,7 @@
 export const colors = {
     red: '#FF0000',
     black: '#000000',
+    background: '#191a01',
 };
 
 export const cardStyles = {

@@ -30,6 +30,7 @@
   "include": [
     "client/**/*.ts",
     "client/**/*.tsx",
+    "client/**/*.d.ts",
     "utils/**/*.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

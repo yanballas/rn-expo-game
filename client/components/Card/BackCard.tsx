@@ -7,7 +7,7 @@ export function BackCard() {
 
     return (
         <View style={styles.container}>
-            <Image source={imageSource} style={styles.image} />
+            <Image source={imageSource} style={styles.image} contentFit="cover" />
         </View>
     );
 }
@@ -22,6 +22,5 @@ const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover',
     },
 });
