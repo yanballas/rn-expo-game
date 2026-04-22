@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { StyleSheet } from 'react-native';
+import { ImageStyle, StyleSheet } from 'react-native';
 
 import { BackgroundProps } from '@/client/utils/types';
 
@@ -13,6 +13,6 @@ const styles = StyleSheet.create({
     },
 });
 
-export function Background({ source, contentFit = 'cover' }: BackgroundProps) {
-    return <Image source={source} style={styles.image} contentFit={contentFit} />;
+export function Background({ source, contentFit = 'cover', style }: BackgroundProps) {
+    return <Image source={source} style={[styles.image, style as ImageStyle]} contentFit={contentFit} />;
 }

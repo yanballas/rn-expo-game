@@ -1,6 +1,5 @@
 // Статические импорты всех изображений для предзагрузки
 export const imageAssets = [
-    require('@/client/assets/images/cardBack.png'),
     require('@/client/assets/images/icon.png'),
     require('@/client/assets/images/splash-icon.png'),
     require('@/client/assets/images/favicon.png'),
@@ -10,7 +9,9 @@ export const imageAssets = [
     require('@/client/assets/images/android-icon-foreground.png'),
     require('@/client/assets/images/android-icon-background.png'),
 
-    require('@/client/assets/images/card/bg_card.png'),
+    require('@/client/assets/images/card/bg_walpaper_0.png'),
+    require('@/client/assets/images/card/bg_walpaper_1.png'),
+    require('@/client/assets/images/card/bg_back_card_0.png'),
 
     require('@/client/assets/images/background/bg_loading.png'),
     require('@/client/assets/images/background/bg_main.png'),

@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
 import type { ImageContentFit } from 'expo-image';
+import { ReactNode } from 'react';
 import { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 
 import { cardRanks, cardSuits } from '@utils/constants';
@@ -23,4 +23,5 @@ export interface FullCard extends FrontCard {
 export type BackgroundProps = {
     source: ImageSourcePropType;
     contentFit?: ImageContentFit;
+    style?: StyleProp<ViewStyle>;
 };

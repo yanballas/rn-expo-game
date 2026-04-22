@@ -1,16 +1,13 @@
 export const colors = {
-    red: '#FF0000',
+    red: '#AA0505',
     black: '#000000',
     background: '#191a01',
 };
 
 export const cardStyles = {
-    width: 120,
-    height: 200,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'black',
-    padding: 16,
+    width: 86,
+    height: 103,
+    borderRadius: 8,
     overflow: 'hidden',
 } as const;
 

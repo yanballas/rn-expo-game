@@ -1,26 +1,35 @@
 import { cardStyles } from '@/client/utils/constants';
-import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
+import { Background } from '@/client/components/Background';
+
 export function BackCard() {
-    const imageSource = require('@/client/assets/images/cardBack.png');
+    const bgWalpaperPng = require('@/client/assets/images/card/bg_walpaper_1.png');
+    const bgBackCardPng = require('@/client/assets/images/card/bg_back_card_0.png');
 
     return (
         <View style={styles.container}>
-            <Image source={imageSource} style={styles.image} contentFit="cover" />
+            <Background source={bgWalpaperPng} />
+            <Background source={bgBackCardPng} style={styles.backgroundBackCard} />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
+        position: 'relative',
         width: cardStyles.width,
         height: cardStyles.height,
         borderRadius: cardStyles.borderRadius,
         overflow: cardStyles.overflow,
     },
-    image: {
-        width: '100%',
-        height: '100%',
+    backgroundBackCard: {
+        width: '90%',
+        height: '90%',
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
+        borderRadius: cardStyles.borderRadius - 6,
     },
 });

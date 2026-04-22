@@ -24,7 +24,7 @@ export default function GameScreen() {
             <Background source={bgMainPng} />
             <Background source={bgItemsPng} />
             <Image source={bgPatternPng} style={styles.backgroundImagePattern} contentFit="contain" />
-            <FullCard card={{ rank: 'A', suit: 'hearts', isFlipped }} />
+            <FullCard card={{ rank: 'K', suit: 'clubs', isFlipped }} />
             <Pressable onPress={handleAnimatePress} style={styles.button}>
                 <Text style={styles.buttonText}>Flip card</Text>
             </Pressable>
