@@ -18,8 +18,9 @@ export const flipTransition = {
 
 export const defaultHandSlotCount = 2;
 
-/** Horizontal gap between cards in `Hand` row — keep in sync with `Hand` layout. */
 export const handCardsRowGap = 12;
+
+export const cardHalfHeightPx = Math.round(cardStyles.height / 2);
 
 export const deckAnimation = {
     duration: 500,

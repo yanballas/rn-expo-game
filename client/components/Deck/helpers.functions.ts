@@ -1,5 +1,13 @@
 import type { CardPosition, FlightSchedulingHandles, FrontCard } from '@/client/utils/types';
 import { cardRanks, cardSuits } from '@utils/constants';
+import type { EasingFunction, EasingFunctionFactory, SharedValue } from 'react-native-reanimated';
+import { withDelay, withTiming } from 'react-native-reanimated';
+
+export interface FlightAnimationOptions {
+    interval: number;
+    duration: number;
+    easing: EasingFunction | EasingFunctionFactory;
+}
 
 export function buildDeck(): FrontCard[] {
     const deck: FrontCard[] = [];
@@ -37,13 +45,62 @@ export function resolveSlotPosition(
             y: positions[0].y,
         };
     }
-    const dx = positions[iLast].x - positions[iLast - 1].x;
-    const dy = positions[iLast].y - positions[iLast - 1].y;
+    const deltaX = positions[iLast].x - positions[iLast - 1].x;
+    const deltaY = positions[iLast].y - positions[iLast - 1].y;
     const steps = slotIndex - iLast;
     return {
-        x: positions[iLast].x + dx * steps,
-        y: positions[iLast].y + dy * steps,
+        x: positions[iLast].x + deltaX * steps,
+        y: positions[iLast].y + deltaY * steps,
     };
+}
+
+export function takeRandomCardsFromPool(
+    pool: FrontCard[],
+    count: number,
+): { picked: FrontCard[]; remaining: FrontCard[] } {
+    const picked = pickRandomCards(pool, count);
+    const remaining = pool.filter(
+        card => !picked.some(pickedCard => pickedCard.rank === card.rank && pickedCard.suit === card.suit),
+    );
+    return { picked, remaining };
+}
+
+export function animateCardFlight(
+    targets: CardPosition[],
+    deckPos: CardPosition,
+    translateXRefs: SharedValue<number>[],
+    translateYRefs: SharedValue<number>[],
+    options: FlightAnimationOptions,
+    onComplete: () => void,
+): () => void {
+    const scheduling: FlightSchedulingHandles = { rafId: null, timeoutId: null };
+
+    const staggerDelay = Math.max(0, (targets.length - 1) * options.interval);
+    const totalDelay = staggerDelay + options.duration;
+
+    runNextFrameAndAfterDelay(
+        scheduling,
+        totalDelay,
+        () => {
+            for (let i = 0; i < targets.length; i++) {
+                const targetX = targets[i].x - deckPos.x;
+                const targetY = targets[i].y - deckPos.y;
+                const delay = i * options.interval;
+
+                translateXRefs[i].value = withDelay(
+                    delay,
+                    withTiming(targetX, { duration: options.duration, easing: options.easing }),
+                );
+                translateYRefs[i].value = withDelay(
+                    delay,
+                    withTiming(targetY, { duration: options.duration, easing: options.easing }),
+                );
+            }
+        },
+        onComplete,
+    );
+
+    return () => clearFlightScheduling(scheduling);
 }
 
 export function clearFlightScheduling(handles: FlightSchedulingHandles) {

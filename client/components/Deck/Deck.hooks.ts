@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { Easing, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import { Easing, useSharedValue } from 'react-native-reanimated';
 
 import {
     cardStyles,
@@ -13,7 +13,6 @@ import type {
     DealFlightMotion,
     DeckFlyingCardItem,
     DeckPosRef,
-    FlightSchedulingHandles,
     FullCard,
     HitRecipient,
     HitRequest,
@@ -22,10 +21,9 @@ import type {
 } from '@/client/utils/types';
 
 import {
-    clearFlightScheduling,
-    pickRandomCards,
+    animateCardFlight,
+    takeRandomCardsFromPool,
     resolveSlotPosition,
-    runNextFrameAndAfterDelay,
 } from './helpers.functions';
 
 const { duration: animDuration, sequenceInterval, flyingCardCount, easingBezier } = deckAnimation;
@@ -44,6 +42,9 @@ export function useDealFlightMotion(): DealFlightMotion {
     const flightXToPlayerSecond = useSharedValue(deckTopCardOriginInset);
     const flightYToPlayerSecond = useSharedValue(deckTopCardOriginInset);
 
+    // Slot index → target mapping:
+    //   0 = dealer 1st card, 1 = dealer 2nd card
+    //   2 = player 1st card, 3 = player 2nd card
     const translateXRefs = useRef([
         flightXToDealerFirst,
         flightXToDealerSecond,
@@ -103,29 +104,18 @@ export function useDealFromDeck({
             ...playerPositions.slice(0, defaultHandSlotCount),
         ];
 
-        const picked = pickRandomCards(poolRef.current, flyingCardCount);
-        poolRef.current = poolRef.current.filter(c => !picked.some(p => p.rank === c.rank && p.suit === c.suit));
+        const { picked, remaining } = takeRandomCardsFromPool(poolRef.current, flyingCardCount);
+        poolRef.current = remaining;
 
         const id = ++uniqueId.current;
-        const cardItems = picked.map((card, i) => ({ id: id + i, card, targetIndex: i }));
-        setFlyingCards(cardItems);
+        setFlyingCards(picked.map((card, i) => ({ id: id + i, card, targetIndex: i })));
 
-        const scheduling: FlightSchedulingHandles = { rafId: null, timeoutId: null };
-        const totalDelay = flyingCardCount * sequenceInterval + animDuration;
-
-        runNextFrameAndAfterDelay(
-            scheduling,
-            totalDelay,
-            () => {
-                for (let i = 0; i < flyingCardCount; i++) {
-                    const targetX = targets[i].x - deckPos.current.x;
-                    const targetY = targets[i].y - deckPos.current.y;
-                    const delay = i * sequenceInterval;
-
-                    translateXRefs[i].value = withDelay(delay, withTiming(targetX, { duration: animDuration, easing }));
-                    translateYRefs[i].value = withDelay(delay, withTiming(targetY, { duration: animDuration, easing }));
-                }
-            },
+        return animateCardFlight(
+            targets,
+            deckPos.current,
+            translateXRefs,
+            translateYRefs,
+            { interval: sequenceInterval, duration: animDuration, easing },
             () => {
                 const dealerCards: FullCard[] = picked.slice(0, defaultHandSlotCount).map(c => ({
                     ...c,
@@ -140,8 +130,6 @@ export function useDealFromDeck({
                 onDealComplete(dealerCards, playerCards);
             },
         );
-
-        return () => clearFlightScheduling(scheduling);
     }, [
         isDealing,
         deckReady,
@@ -192,35 +180,29 @@ export function useHitCardFlight({
         const target = resolveSlotPosition(positions, hitRequest.slotIndex, cardStyles.width, handCardsRowGap);
         if (!target) return;
 
-        const picked = pickRandomCards(poolRef.current, 1)[0];
-        if (!picked) return;
-        poolRef.current = poolRef.current.filter(c => !(c.rank === picked.rank && c.suit === picked.suit));
+        const { picked, remaining } = takeRandomCardsFromPool(poolRef.current, 1);
+        poolRef.current = remaining;
+        const card = picked[0];
+        if (!card) return;
 
         const flyId = ++uniqueId.current;
-        setFlyingCards([{ id: flyId, card: picked, targetIndex: 0 }]);
+        // targetIndex: 0 — после раздачи все 4 канала сброшены resetCards(),
+        // channel 0 гарантированно свободен и не конфликтует с раздачей
+        setFlyingCards([{ id: flyId, card, targetIndex: 0 }]);
 
-        const recipient = hitRequest.recipient;
-        const scheduling: FlightSchedulingHandles = { rafId: null, timeoutId: null };
-
-        runNextFrameAndAfterDelay(
-            scheduling,
-            animDuration,
-            () => {
-                const targetX = target.x - deckPos.current.x;
-                const targetY = target.y - deckPos.current.y;
-
-                translateXRefs[0].value = withTiming(targetX, { duration: animDuration, easing });
-                translateYRefs[0].value = withTiming(targetY, { duration: animDuration, easing });
-            },
+        return animateCardFlight(
+            [target],
+            deckPos.current,
+            [translateXRefs[0]],
+            [translateYRefs[0]],
+            { interval: 0, duration: animDuration, easing },
             () => {
                 setFlyingCards([]);
                 translateXRefs[0].value = deckTopCardOriginInset;
                 translateYRefs[0].value = deckTopCardOriginInset;
-                onHitComplete(recipient, { ...picked, isFlipped: true });
+                onHitComplete(hitRequest.recipient, { ...card, isFlipped: true });
             },
         );
-
-        return () => clearFlightScheduling(scheduling);
     }, [
         hitRequest,
         deckReady,

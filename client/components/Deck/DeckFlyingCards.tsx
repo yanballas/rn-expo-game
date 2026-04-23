@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
-import { cardStyles, deckLeftInset } from '@/client/utils/constants';
+import { cardStyles } from '@/client/utils/constants';
 import type { DealFlightMotion, DeckFlyingCardItem, FrontCard } from '@/client/utils/types';
 
 function AnimatedFlyingCard({
@@ -19,8 +19,10 @@ function AnimatedFlyingCard({
     }));
 
     return (
-        <Animated.View style={[styles.flyingCard, animatedStyle]}>
-            <FullCard card={{ rank: card.rank, suit: card.suit, isFlipped: false }} />
+        <Animated.View style={styles.flyingCardAnchor}>
+            <Animated.View style={[styles.flyingCardMotion, animatedStyle]}>
+                <FullCard card={{ rank: card.rank, suit: card.suit, isFlipped: false }} />
+            </Animated.View>
         </Animated.View>
     );
 }
@@ -42,13 +44,16 @@ export function DeckFlyingCardsList({ items, motion }: { items: DeckFlyingCardIt
 }
 
 const styles = StyleSheet.create({
-    flyingCard: {
+    flyingCardAnchor: {
         position: 'absolute',
-        left: deckLeftInset,
-        top: '50%',
+        left: 0,
+        top: 0,
         width: cardStyles.width,
         height: cardStyles.height,
-        marginTop: -(cardStyles.height / 2),
-        zIndex: 100,
+        zIndex: 2,
+    },
+    flyingCardMotion: {
+        width: '100%',
+        height: '100%',
     },
 });
