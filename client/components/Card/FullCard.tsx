@@ -26,7 +26,7 @@ function AnimatedCardFace({ children, isVisible, rotateY, style }: AnimatedCardF
     }, [rotateY]);
 
     return (
-        <Animated.View pointerEvents={isVisible ? 'auto' : 'none'} style={[styles.cardFace, style, animatedStyle]}>
+        <Animated.View style={[styles.cardFace, style, animatedStyle, { pointerEvents: isVisible ? 'auto' : 'none' }]}>
             {children}
         </Animated.View>
     );
