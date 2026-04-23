@@ -2,7 +2,13 @@ import { useCallback, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { BackCard } from '@/client/components/Card/BackCard';
-import { cardHalfHeightPx, cardStyles, deckLeftInset, deckStackOffset } from '@/client/utils/constants';
+import {
+    cardHalfHeightPx,
+    cardStyles,
+    deckLeftInset,
+    deckStackOffset,
+    deckTopCardOriginInset,
+} from '@/client/utils/constants';
 import type { CardPosition, DeckFlyingCardItem, FullCard, HitRecipient, HitRequest } from '@/client/utils/types';
 
 import { useDealFlightMotion, useDealFromDeck, useHitCardFlight } from './Deck.hooks';
@@ -71,7 +77,7 @@ export function Deck({
     });
 
     return (
-        <View style={styles.wrapper} pointerEvents="none">
+        <View style={styles.wrapper}>
             <View ref={deckRef} style={styles.deckVisual} onLayout={handleDeckLayout}>
                 <View style={[styles.stackCard, styles.stackCard1]}>
                     <BackCard />
@@ -95,6 +101,7 @@ const styles = StyleSheet.create({
         right: 0,
         top: 0,
         bottom: 0,
+        pointerEvents: 'none',
     },
     deckVisual: {
         position: 'absolute',
@@ -122,8 +129,8 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     stackCard3: {
-        top: deckStackOffset * 2,
-        left: deckStackOffset * 2,
+        top: deckTopCardOriginInset,
+        left: deckTopCardOriginInset,
         zIndex: 3,
     },
 });

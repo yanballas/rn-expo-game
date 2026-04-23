@@ -4,7 +4,7 @@ import { Easing, useSharedValue } from 'react-native-reanimated';
 import {
     cardStyles,
     deckAnimation,
-    deckStackOffset,
+    deckTopCardOriginInset,
     defaultHandSlotCount,
     handCardsRowGap,
 } from '@/client/utils/constants';
@@ -20,18 +20,20 @@ import type {
     UniqueIdRef,
 } from '@/client/utils/types';
 
-import {
-    animateCardFlight,
-    takeRandomCardsFromPool,
-    resolveSlotPosition,
-} from './helpers.functions';
+import { animateCardFlight, resolveSlotPosition, takeRandomCardsFromPool } from './helpers.functions';
 
 const { duration: animDuration, sequenceInterval, flyingCardCount, easingBezier } = deckAnimation;
 const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], easingBezier[3]);
 
-/** Matches `styles.stackCard3` in `Deck.tsx` — top card of the stack (flight origin). */
-const deckTopCardOriginInset = deckStackOffset * 2;
-
+/**
+ * Хранит «движок» анимации полёта карт из колоды: восемь `SharedValue` (четыре карты × ось X и Y),
+ * сгруппированные в массивы `translateXRefs` / `translateYRefs`. Индексы 0–3 совпадают с порядком
+ * раздачи (две карты дилера, две игрока). Значения — смещение от верхней карты колоды до цели;
+ * старт совпадает с `deckTopCardOriginInset`, чтобы летающая карта лежала на стопке до анимации.
+ * Массивы обёрнуты в `useRef`, чтобы ссылки не менялись между рендерами и эффекты могли
+ * безопасно зависеть от них. `reset` сбрасывает первые `flyingCardCount` каналов в эту стартовую
+ * точку после раздачи или перед следующим полётом.
+ */
 export function useDealFlightMotion(): DealFlightMotion {
     const flightXToDealerFirst = useSharedValue(deckTopCardOriginInset);
     const flightYToDealerFirst = useSharedValue(deckTopCardOriginInset);
@@ -68,6 +70,7 @@ export function useDealFlightMotion(): DealFlightMotion {
     return { translateXRefs, translateYRefs, reset };
 }
 
+/** При старте раздачи: карты из пула, полёт к слотам дилера/игрока, затем `onDealComplete`. */
 export function useDealFromDeck({
     isDealing,
     deckReady,
@@ -146,6 +149,7 @@ export function useDealFromDeck({
     ]);
 }
 
+/** По `hitRequest`: одна карта из колоды в слот игрока или дилера, затем `onHitComplete`. */
 export function useHitCardFlight({
     hitRequest,
     deckReady,
