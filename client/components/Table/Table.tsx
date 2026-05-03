@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { BackCard } from '@/client/components/Card/BackCard';
 import { cardStyles, deckLeftInset, deckStackOffset, deckTopCardOriginInset } from '@/client/utils/constants';
+import { logDeckRemaining } from '@/client/utils/functions';
 import type { CardEntity, CardPosition, FullCard, HitRequest, Recipient } from '@/client/utils/types';
 
 import { buildDeck, isFlippedAfterFly } from './helpers.functions';
@@ -84,6 +85,12 @@ export function Table({
             setDeckReady(true);
         });
     }, []);
+
+    // logs
+    useEffect(() => {
+        if (!deckReady) return;
+        logDeckRemaining(poolRef.current);
+    }, [deckReady]);
 
     useDealCards({
         isDealing,

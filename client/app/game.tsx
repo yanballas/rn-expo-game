@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Background } from '@/client/components/Background';
 import { Hand } from '@/client/components/Hand';
 import { Table } from '@/client/components/Table/Table';
 import { colors, defaultHandSlotCount } from '@/client/utils/constants';
+import { logDealerHand, logPlayerHand } from '@/client/utils/functions';
 import type { CardPosition, FullCard, HitRequest } from '@/client/utils/types';
 
 import bgItemsPng from '@/client/assets/images/background/bg_items.png';
@@ -21,6 +22,16 @@ export default function GameScreen() {
     const [dealerPositions, setDealerPositions] = useState<CardPosition[]>([]);
     const [playerPositions, setPlayerPositions] = useState<CardPosition[]>([]);
     const [hitRequest, setHitRequest] = useState<HitRequest | null>(null);
+
+    // logs
+    useEffect(() => {
+        logPlayerHand(playerCards);
+    }, [playerCards]);
+
+    // logs
+    useEffect(() => {
+        logDealerHand(dealerCards);
+    }, [dealerCards]);
 
     const handleDeal = useCallback(() => {
         setIsDealing(true);

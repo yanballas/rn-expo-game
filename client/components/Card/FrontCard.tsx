@@ -91,7 +91,9 @@ export function FrontCard({ card: { rank, suit } }: { card: FrontCardType }) {
                             />
                         </View>
                     )}
-                    <Text style={[styles.rankText, { color: cardColor }]}>{rank.toUpperCase()}</Text>
+                    <Text style={[styles.rankText, styles.rankBottomText, { color: cardColor }]}>
+                        {rank.toUpperCase()}
+                    </Text>
                 </View>
             </View>
         </View>
@@ -128,6 +130,9 @@ const styles = StyleSheet.create({
     rankText: {
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    rankBottomText: {
+        transform: [{ rotate: '180deg' }],
     },
     rankImg: {
         width: 8,

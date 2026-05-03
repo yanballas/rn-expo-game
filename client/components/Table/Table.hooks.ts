@@ -1,6 +1,7 @@
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 
 import { cardStyles, deckAnimation, defaultHandSlotCount, handCardsRowGap } from '@/client/utils/constants';
+import { logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
 import type { CardEntity, CardPosition, HitRequest, PoolRef, UniqueIdRef } from '@/client/utils/types';
 
 import { resolveSlotPosition, takeRandomCardsFromPool } from './helpers.functions';
@@ -42,6 +43,8 @@ export function useDealCards({
 
         const { picked, remaining } = takeRandomCardsFromPool(poolRef.current, flyingCardCount);
         poolRef.current = remaining;
+        // logs
+        logDeckRemaining(poolRef.current);
 
         const entities: CardEntity[] = picked.map((card, i) => {
             const isDealer = i < defaultHandSlotCount;
@@ -57,7 +60,13 @@ export function useDealCards({
         });
 
         onDealStart?.();
-        setEntities(entities);
+        // logs
+        setEntities(prev => {
+            if (prev.length > 0) {
+                logEntitiesCleared();
+            }
+            return entities;
+        });
     }, [isDealing, deckReady, dealerPositionsRef, playerPositionsRef, poolRef, uniqueId, setEntities, onDealStart]);
 }
 
@@ -90,6 +99,8 @@ export function useHitCard({
 
         const { picked, remaining } = takeRandomCardsFromPool(poolRef.current, 1);
         poolRef.current = remaining;
+        // logs
+        logDeckRemaining(poolRef.current);
         const card = picked[0];
         if (!card) return;
 
