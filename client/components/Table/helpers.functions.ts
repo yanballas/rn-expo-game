@@ -1,4 +1,4 @@
-import type { CardPosition, FrontCard } from '@/client/utils/types';
+import type { CardEntity, CardPosition, FrontCard } from '@/client/utils/types';
 import { cardRanks, cardSuits } from '@utils/constants';
 
 export function buildDeck(): FrontCard[] {
@@ -52,7 +52,12 @@ export function takeRandomCardsFromPool(
 ): { picked: FrontCard[]; remaining: FrontCard[] } {
     const shuffled = shufflePool(pool);
     const picked = shuffled.slice(0, count);
-    const pickedKeys = new Set(picked.map(c => `${c.rank}${c.suit}`));
-    const remaining = pool.filter(c => !pickedKeys.has(`${c.rank}${c.suit}`));
+    const remaining = shuffled.slice(count);
     return { picked, remaining };
+}
+
+export function isFlippedAfterFly(entity: CardEntity): boolean {
+    if (entity.origin === 'hit') return true;
+    if (entity.recipient === 'player') return true;
+    return entity.slotIndex === 0;
 }

@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
     container: {
         position: 'relative',
         flex: 1,
+        overflow: 'hidden',
         backgroundColor: colors.background,
     },
     backgroundImagePattern: {

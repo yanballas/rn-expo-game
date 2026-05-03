@@ -1,18 +1,7 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 
-import {
-    cardStyles,
-    deckAnimation,
-    defaultHandSlotCount,
-    handCardsRowGap,
-} from '@/client/utils/constants';
-import type {
-    CardEntity,
-    CardPosition,
-    HitRequest,
-    PoolRef,
-    UniqueIdRef,
-} from '@/client/utils/types';
+import { cardStyles, deckAnimation, defaultHandSlotCount, handCardsRowGap } from '@/client/utils/constants';
+import type { CardEntity, CardPosition, HitRequest, PoolRef, UniqueIdRef } from '@/client/utils/types';
 
 import { resolveSlotPosition, takeRandomCardsFromPool } from './helpers.functions';
 
@@ -21,8 +10,8 @@ const { flyingCardCount } = deckAnimation;
 export function useDealCards({
     isDealing,
     deckReady,
-    dealerPositions,
-    playerPositions,
+    dealerPositionsRef,
+    playerPositionsRef,
     poolRef,
     uniqueId,
     setEntities,
@@ -30,8 +19,8 @@ export function useDealCards({
 }: {
     isDealing: boolean;
     deckReady: boolean;
-    dealerPositions: CardPosition[];
-    playerPositions: CardPosition[];
+    dealerPositionsRef: RefObject<CardPosition[]>;
+    playerPositionsRef: RefObject<CardPosition[]>;
     poolRef: PoolRef;
     uniqueId: UniqueIdRef;
     setEntities: Dispatch<SetStateAction<CardEntity[]>>;
@@ -39,6 +28,9 @@ export function useDealCards({
 }) {
     useEffect(() => {
         if (!isDealing || !deckReady) return;
+        const dealerPositions = dealerPositionsRef.current;
+        const playerPositions = playerPositionsRef.current;
+        if (!dealerPositions || !playerPositions) return;
         if (dealerPositions.length < defaultHandSlotCount || playerPositions.length < defaultHandSlotCount) {
             return;
         }
@@ -66,24 +58,15 @@ export function useDealCards({
 
         onDealStart?.();
         setEntities(entities);
-    }, [
-        isDealing,
-        deckReady,
-        dealerPositions,
-        playerPositions,
-        poolRef,
-        uniqueId,
-        setEntities,
-        onDealStart,
-    ]);
+    }, [isDealing, deckReady, dealerPositionsRef, playerPositionsRef, poolRef, uniqueId, setEntities, onDealStart]);
 }
 
 export function useHitCard({
     hitRequest,
     deckReady,
     isDealing,
-    dealerPositions,
-    playerPositions,
+    dealerPositionsRef,
+    playerPositionsRef,
     poolRef,
     uniqueId,
     setEntities,
@@ -91,8 +74,8 @@ export function useHitCard({
     hitRequest: HitRequest | null;
     deckReady: boolean;
     isDealing: boolean;
-    dealerPositions: CardPosition[];
-    playerPositions: CardPosition[];
+    dealerPositionsRef: RefObject<CardPosition[]>;
+    playerPositionsRef: RefObject<CardPosition[]>;
     poolRef: PoolRef;
     uniqueId: UniqueIdRef;
     setEntities: Dispatch<SetStateAction<CardEntity[]>>;
@@ -100,7 +83,8 @@ export function useHitCard({
     useEffect(() => {
         if (!hitRequest || !deckReady || isDealing) return;
 
-        const positions = hitRequest.recipient === 'player' ? playerPositions : dealerPositions;
+        const positions = hitRequest.recipient === 'player' ? playerPositionsRef.current : dealerPositionsRef.current;
+        if (!positions) return;
         const target = resolveSlotPosition(positions, hitRequest.slotIndex, cardStyles.width, handCardsRowGap);
         if (!target) return;
 
@@ -121,14 +105,5 @@ export function useHitCard({
         };
 
         setEntities(prev => [...prev, entity]);
-    }, [
-        hitRequest,
-        deckReady,
-        isDealing,
-        dealerPositions,
-        playerPositions,
-        poolRef,
-        uniqueId,
-        setEntities,
-    ]);
+    }, [hitRequest, deckReady, isDealing, dealerPositionsRef, playerPositionsRef, poolRef, uniqueId, setEntities]);
 }

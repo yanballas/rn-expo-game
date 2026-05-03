@@ -2,15 +2,10 @@ import { useCallback, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { BackCard } from '@/client/components/Card/BackCard';
-import {
-    cardStyles,
-    deckLeftInset,
-    deckStackOffset,
-    deckTopCardOriginInset,
-} from '@/client/utils/constants';
+import { cardStyles, deckLeftInset, deckStackOffset, deckTopCardOriginInset } from '@/client/utils/constants';
 import type { CardEntity, CardPosition, FullCard, HitRequest, Recipient } from '@/client/utils/types';
 
-import { buildDeck } from './helpers.functions';
+import { buildDeck, isFlippedAfterFly } from './helpers.functions';
 import { useDealCards, useHitCard } from './Table.hooks';
 import { TableCard } from './TableCard';
 
@@ -34,10 +29,14 @@ export function Table({
     onHitComplete,
 }: TableProps) {
     const deckRef = useRef<View>(null);
-    const [deckPos, setDeckPos] = useState<CardPosition>({ x: 0, y: 0 });
+    const [deckPosition, setDeckPosition] = useState<CardPosition>({ x: 0, y: 0 });
     const [deckReady, setDeckReady] = useState(false);
     const poolRef = useRef(buildDeck());
     const uniqueId = useRef(0);
+    const dealerPositionsRef = useRef(dealerPositions);
+    dealerPositionsRef.current = dealerPositions;
+    const playerPositionsRef = useRef(playerPositions);
+    playerPositionsRef.current = playerPositions;
 
     const [entities, setEntities] = useState<CardEntity[]>([]);
 
@@ -50,30 +49,38 @@ export function Table({
         pendingDealIdsRef.current.clear();
     }, []);
 
-    const handleCardComplete = useCallback((entityId: number) => {
-        const entity = entitiesRef.current.find(e => e.id === entityId);
-        if (!entity) return;
+    const handleCardComplete = useCallback(
+        (entityId: number) => {
+            const entity = entitiesRef.current.find(e => e.id === entityId);
+            if (!entity) return;
 
-        if (entity.origin === 'deal') {
-            pendingDealIdsRef.current.add(entityId);
-            const totalDealEntities = entitiesRef.current.filter(e => e.origin === 'deal').length;
-            if (pendingDealIdsRef.current.size === totalDealEntities && totalDealEntities > 0) {
-                pendingDealIdsRef.current.clear();
-                const dealEntities = entitiesRef.current.filter(e => e.origin === 'deal');
-                onDealComplete(
-                    dealEntities.filter(e => e.recipient === 'dealer').map(e => ({ ...e.card, isFlipped: true })),
-                    dealEntities.filter(e => e.recipient === 'player').map(e => ({ ...e.card, isFlipped: true })),
-                );
+            // первая раздача завершена
+            if (entity.origin === 'deal') {
+                pendingDealIdsRef.current.add(entityId);
+                const totalDealEntities = entitiesRef.current.filter(e => e.origin === 'deal').length;
+                if (pendingDealIdsRef.current.size === totalDealEntities && totalDealEntities > 0) {
+                    pendingDealIdsRef.current.clear();
+                    // получаем все карты раздачи
+                    const dealEntities = entitiesRef.current.filter(entity => entity.origin === 'deal');
+                    const dealerCards = dealEntities.filter(entity => entity.recipient === 'dealer');
+                    const playerCards = dealEntities.filter(entity => entity.recipient === 'player');
+                    onDealComplete(
+                        dealerCards.map(entity => ({ ...entity.card, isFlipped: isFlippedAfterFly(entity) })),
+                        playerCards.map(entity => ({ ...entity.card, isFlipped: isFlippedAfterFly(entity) })),
+                    );
+                }
+                return;
             }
-            return;
-        }
 
-        onHitComplete(entity.recipient, { ...entity.card, isFlipped: true });
-    }, [onDealComplete, onHitComplete]);
+            // хит завершен
+            onHitComplete(entity.recipient, { ...entity.card, isFlipped: true });
+        },
+        [onDealComplete, onHitComplete],
+    );
 
     const handleDeckLayout = useCallback((_e: LayoutChangeEvent) => {
         deckRef.current?.measureInWindow((x: number, y: number) => {
-            setDeckPos({ x, y });
+            setDeckPosition({ x, y });
             setDeckReady(true);
         });
     }, []);
@@ -81,8 +88,8 @@ export function Table({
     useDealCards({
         isDealing,
         deckReady,
-        dealerPositions,
-        playerPositions,
+        dealerPositionsRef,
+        playerPositionsRef,
         poolRef,
         uniqueId,
         setEntities,
@@ -93,8 +100,8 @@ export function Table({
         hitRequest,
         deckReady,
         isDealing,
-        dealerPositions,
-        playerPositions,
+        dealerPositionsRef,
+        playerPositionsRef,
         poolRef,
         uniqueId,
         setEntities,
@@ -116,7 +123,7 @@ export function Table({
                     <TableCard
                         key={entity.id}
                         entity={entity}
-                        deckPos={deckPos}
+                        deckPosition={deckPosition}
                         onComplete={handleCardComplete}
                     />
                 ))}

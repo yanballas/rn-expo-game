@@ -15,9 +15,15 @@ export function Hand({ count, label, score, onCardLayout }: HandProps) {
     const slotRefs = useRef<(View | null)[]>([]);
 
     const slotCount = onCardLayout ? Math.max(count, defaultHandSlotCount) : count;
+    const layoutSentinelRef = useRef(false);
 
     useEffect(() => {
-        if (!onCardLayout || slotCount === 0) return;
+        layoutSentinelRef.current = false;
+    }, [slotCount]);
+
+    useEffect(() => {
+        if (!onCardLayout || slotCount === 0 || layoutSentinelRef.current) return;
+        layoutSentinelRef.current = true;
 
         const positions: CardPosition[] = [];
         let slotsPlaceholders = 0;

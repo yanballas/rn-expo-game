@@ -33,3 +33,5 @@ export const deckStackOffset = 6;
 export const deckLeftInset = 14;
 
 export const deckTopCardOriginInset = deckStackOffset * 2;
+
+export const TableCardInitialZIndex = 10;
