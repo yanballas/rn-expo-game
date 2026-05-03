@@ -4,8 +4,8 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Background } from '@/client/components/Background';
-import { Deck } from '@/client/components/Deck/Deck';
-import { Hand } from '@/client/components/Hand/Hand';
+import { Hand } from '@/client/components/Hand';
+import { Table } from '@/client/components/Table/Table';
 import { colors, defaultHandSlotCount } from '@/client/utils/constants';
 import type { CardPosition, FullCard, HitRequest } from '@/client/utils/types';
 
@@ -65,14 +65,14 @@ export default function GameScreen() {
             <Image source={bgPatternPng} style={styles.backgroundImagePattern} contentFit="contain" />
 
             <View style={styles.topArea}>
-                <Hand cards={dealerCards} label="Дилер" onCardLayout={handleDealerLayout} />
+                <Hand count={dealerCards.length} label="Дилер" onCardLayout={handleDealerLayout} />
             </View>
 
             <View style={styles.bottomArea}>
-                <Hand cards={playerCards} label="Игрок" onCardLayout={handlePlayerLayout} />
+                <Hand count={playerCards.length} label="Игрок" onCardLayout={handlePlayerLayout} />
             </View>
 
-            <Deck
+            <Table
                 isDealing={isDealing}
                 dealerPositions={dealerPositions}
                 playerPositions={playerPositions}

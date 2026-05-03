@@ -3,11 +3,14 @@ import { ReactNode, RefObject } from 'react';
 import { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 
 import { cardRanks, cardSuits } from '@utils/constants';
-import { SharedValue } from 'react-native-reanimated';
 
 export interface FrontCard {
     rank: (typeof cardRanks)[number];
     suit: (typeof cardSuits)[number];
+}
+
+export interface FullCard extends FrontCard {
+    isFlipped?: boolean;
 }
 
 export interface AnimatedCardFace {
@@ -15,10 +18,6 @@ export interface AnimatedCardFace {
     isVisible: boolean;
     rotateY: string;
     style?: StyleProp<ViewStyle>;
-}
-
-export interface FullCard extends FrontCard {
-    isFlipped?: boolean;
 }
 
 export type BackgroundProps = {
@@ -33,30 +32,22 @@ export type CardPosition = {
 };
 
 export type PoolRef = RefObject<FrontCard[]>;
-export type DeckPosRef = RefObject<CardPosition>;
 export type UniqueIdRef = RefObject<number>;
 
-export type DeckFlyingCardItem = {
+export type Recipient = 'player' | 'dealer';
+
+export type CardEntity = {
     id: number;
-    card: FrontCard;
-    targetIndex: number;
+    card: FullCard;
+    origin: 'deal' | 'hit';
+    recipient: Recipient;
+    slotIndex: number;
+    targetPosition: CardPosition;
+    animationChannel: number;
 };
-
-export type DealFlightMotion = {
-    translateXRefs: SharedValue<number>[];
-    translateYRefs: SharedValue<number>[];
-    reset: () => void;
-};
-
-export type HitRecipient = 'player' | 'dealer';
 
 export type HitRequest = {
     id: number;
-    recipient: HitRecipient;
+    recipient: Recipient;
     slotIndex: number;
-};
-
-export type FlightSchedulingHandles = {
-    rafId: number | null;
-    timeoutId: ReturnType<typeof setTimeout> | null;
 };

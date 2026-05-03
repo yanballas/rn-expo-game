@@ -12,7 +12,6 @@ export const cardStyles = {
 } as const;
 
 export const flipTransition = {
-    type: 'timing' as const,
     duration: 800,
 };
 
