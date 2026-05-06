@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
-import { cardStyles, deckAnimation, deckTopCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
-import type { CardEntity, CardPosition } from '@/client/utils/types';
+import { useGameStore } from '@/client/store';
+import { cardStyles, deckAnimation, deckCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
+import type { CardEntity } from '@/client/utils/types';
 import { isFlippedAfterFly } from './helpers.functions';
 
 const { duration, sequenceInterval, easingBezier } = deckAnimation;
@@ -12,20 +13,17 @@ const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], 
 
 interface TableCardProps {
     entity: CardEntity;
-    deckPosition: CardPosition;
-    onComplete: (entityId: number) => void;
 }
 
-export function TableCard({ entity, deckPosition, onComplete }: TableCardProps) {
+export function TableCard({ entity }: TableCardProps) {
+    const deckPosition = useGameStore(store => store.deckPosition);
     const deltaX = entity.targetPosition.x - deckPosition.x;
     const deltaY = entity.targetPosition.y - deckPosition.y;
 
-    const translateX = useSharedValue(deckTopCardOriginInset);
-    const translateY = useSharedValue(deckTopCardOriginInset);
-    const [isFlipped, setFlipped] = useState(false);
-    const onCompleteRef = useRef(onComplete);
-    onCompleteRef.current = onComplete;
+    const translateX = useSharedValue(deckCardOriginInset);
+    const translateY = useSharedValue(deckCardOriginInset);
 
+    const [isFlipped, setFlipped] = useState(false);
     const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - entity.animationChannel);
 
     useEffect(() => {
@@ -37,12 +35,12 @@ export function TableCard({ entity, deckPosition, onComplete }: TableCardProps) 
         translateY.value = withDelay(delay, withTiming(deltaY, { duration: flyDuration, easing }));
 
         const zIndexTimeoutId = setTimeout(() => {
-            setZIndex(TableCardInitialZIndex + entity.id);
+            setZIndex(TableCardInitialZIndex + entity.animationChannel);
         }, delay);
 
         const flipTimeoutId = setTimeout(() => {
             setFlipped(isFlippedAfterFly(entity));
-            onCompleteRef.current(entity.id);
+            useGameStore.getState().completeEntityAnimation(entity.id);
         }, totalTime);
 
         return () => {
@@ -51,6 +49,12 @@ export function TableCard({ entity, deckPosition, onComplete }: TableCardProps) 
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (entity.card.isFlipped) {
+            setFlipped(true);
+        }
+    }, [entity.card.isFlipped]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: translateX.value }, { translateY: translateY.value }],

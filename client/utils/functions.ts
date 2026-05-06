@@ -13,7 +13,7 @@ const colorPlayer = '#2563eb';
 const colorDealer = '#dc2626';
 
 export function formatCard(card: Pick<FrontCard, 'rank' | 'suit'>): string {
-    return `${card.rank}${card.suit}`;
+    return `${card.rank}-${card.suit}`;
 }
 
 export function formatCards(cards: readonly Pick<FrontCard, 'rank' | 'suit'>[]): string {
@@ -35,4 +35,11 @@ export function logDealerHand(cards: readonly Pick<FrontCard, 'rank' | 'suit'>[]
 
 export function logEntitiesCleared() {
     logger('Карты entities очистились', '#64748b');
+}
+
+export function generateId(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
 }

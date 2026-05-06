@@ -1,3 +1,4 @@
+import { cardStyles, handCardsRowGap } from '@/client/utils/constants';
 import type { CardEntity, CardPosition, FrontCard } from '@/client/utils/types';
 import { cardRanks, cardSuits } from '@utils/constants';
 
@@ -8,21 +9,34 @@ export function buildDeck(): FrontCard[] {
             deck.push({ rank: rank as FrontCard['rank'], suit: suit as FrontCard['suit'] });
         }
     }
-    return deck;
+    return shufflePool(deck);
 }
 
-export function resolveSlotPosition(
-    positions: CardPosition[],
-    slotIndex: number,
-    cardWidth: number,
-    rowGap: number,
-): CardPosition | null {
+function shufflePool(pool: FrontCard[]): FrontCard[] {
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+export function takeCardsFromPool(
+    pool: FrontCard[],
+    count: number,
+): { pickedCards: FrontCard[]; remainingCards: FrontCard[] } {
+    const pickedCards = pool.slice(0, count);
+    const remainingCards = pool.slice(count);
+    return { pickedCards, remainingCards };
+}
+
+export function resolveSlotPosition(positions: CardPosition[], slotIndex: number): CardPosition | null {
     if (positions.length === 0) return null;
     if (slotIndex < positions.length) return positions[slotIndex];
 
     const iLast = positions.length - 1;
     if (iLast === 0) {
-        const stepX = cardWidth + rowGap;
+        const stepX = cardStyles.width + handCardsRowGap;
         return {
             x: positions[0].x + stepX * slotIndex,
             y: positions[0].y,
@@ -35,25 +49,6 @@ export function resolveSlotPosition(
         x: positions[iLast].x + deltaX * steps,
         y: positions[iLast].y + deltaY * steps,
     };
-}
-
-function shufflePool(pool: FrontCard[]): FrontCard[] {
-    const shuffled = [...pool];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
-export function takeRandomCardsFromPool(
-    pool: FrontCard[],
-    count: number,
-): { picked: FrontCard[]; remaining: FrontCard[] } {
-    const shuffled = shufflePool(pool);
-    const picked = shuffled.slice(0, count);
-    const remaining = shuffled.slice(count);
-    return { picked, remaining };
 }
 
 export function isFlippedAfterFly(entity: CardEntity): boolean {

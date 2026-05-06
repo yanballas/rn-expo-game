@@ -19,8 +19,6 @@ export const defaultHandSlotCount = 2;
 
 export const handCardsRowGap = 12;
 
-export const cardHalfHeightPx = Math.round(cardStyles.height / 2);
-
 export const deckAnimation = {
     duration: 500,
     sequenceInterval: 180,
@@ -30,8 +28,22 @@ export const deckAnimation = {
 
 export const deckStackOffset = 6;
 
-export const deckLeftInset = 14;
+export const deckPosition = {
+    left: 14,
+    top: '40%' as const,
+};
 
-export const deckTopCardOriginInset = deckStackOffset * 2;
+export const deckCardOriginInset = deckStackOffset * 2;
 
 export const TableCardInitialZIndex = 10;
+
+export const topAreaPosition = {
+    top: '15%' as const,
+    left: 0,
+    right: 0,
+};
+export const bottomAreaPosition = {
+    bottom: '15%' as const,
+    left: 0,
+    right: 0,
+};
