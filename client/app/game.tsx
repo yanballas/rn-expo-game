@@ -15,6 +15,8 @@ import bgPatternPng from '@/client/assets/images/background/bg_pattern.png';
 export default function GameScreen() {
     const router = useRouter();
     const phase = useGameStore(store => store.phase);
+    const playerScore = useGameStore(store => store.playerScore);
+    const dealerScore = useGameStore(store => store.dealerScore);
 
     return (
         <View style={styles.container}>
@@ -24,10 +26,12 @@ export default function GameScreen() {
 
             <View style={[styles.topArea]}>
                 <Hand side="dealer" />
+                <Text style={styles.scoreTop}>{dealerScore}</Text>
             </View>
 
             <View style={[styles.bottomArea]}>
                 <Hand side="player" />
+                <Text style={styles.scoreBottom}>{playerScore}</Text>
             </View>
 
             <Table />
@@ -101,6 +105,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 16,
+    },
+    scoreTop: {
+        position: 'absolute',
+        top: -24,
+        right: 0,
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    scoreBottom: {
+        position: 'absolute',
+        bottom: -24,
+        right: 0,
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: '700',
     },
     button: {
         paddingHorizontal: 18,

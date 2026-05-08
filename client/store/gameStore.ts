@@ -7,7 +7,7 @@ import {
     takeCardsFromPool,
 } from '@/client/components/Table/helpers.functions';
 import { deckAnimation, defaultHandSlotCount } from '@/client/utils/constants';
-import { generateId, logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
+import { calculateScore, generateId, logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
 import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase } from '@/client/utils/types';
 
 const { flyingCardCount } = deckAnimation;
@@ -17,6 +17,8 @@ interface GameStore {
     phase: GamePhase;
     playerHand: FullCard[];
     dealerHand: FullCard[];
+    playerScore: number;
+    dealerScore: number;
     entities: CardEntity[];
     pool: FrontCard[];
     dealerPositions: CardPosition[];
@@ -40,6 +42,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     phase: 'idle',
     playerHand: [],
     dealerHand: [],
+    playerScore: 0,
+    dealerScore: 0,
     entities: [],
     pool: buildDeck(),
     dealerPositions: [],
@@ -104,7 +108,13 @@ export const useGameStore = create<GameStore>()((set, get) => ({
             .filter(entity => entity.recipient === 'player')
             .map(entity => ({ ...entity.card, isFlipped: isFlippedAfterFly(entity) }));
 
-        set({ dealerHand: dealerCards, playerHand: playerCards, phase: 'playerTurn' });
+        set({
+            dealerHand: dealerCards,
+            playerHand: playerCards,
+            dealerScore: calculateScore(dealerCards),
+            playerScore: calculateScore(playerCards),
+            phase: 'playerTurn',
+        });
     },
 
     completeHit: (entityId: string) => {
@@ -114,8 +124,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         const entity = entities.find(entity => entity.id === entityId);
         if (!entity) return;
 
+        const newHand = [...playerHand, { ...entity.card, isFlipped: true }];
+
         set({
-            playerHand: [...playerHand, { ...entity.card, isFlipped: true }],
+            playerHand: newHand,
+            playerScore: calculateScore(newHand),
             phase: 'playerTurn',
         });
     },
@@ -182,7 +195,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
     newRound: () => {
         if (get().phase !== 'roundEnd') return;
-        set({ playerHand: [], dealerHand: [], entities: [], phase: 'idle' });
+        set({ playerHand: [], dealerHand: [], playerScore: 0, dealerScore: 0, entities: [], phase: 'idle' });
     },
 
     setDealerPositions: (positions: CardPosition[]) => set({ dealerPositions: positions }),

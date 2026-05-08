@@ -1,4 +1,23 @@
-import type { FrontCard } from '@/client/utils/types';
+import { cardRankValues } from '@utils/constants';
+import type { FrontCard, FullCard } from '@/client/utils/types';
+
+export function calculateScore(hand: Pick<FullCard, 'rank'>[]): number {
+    let score = 0;
+    let aces = 0;
+    for (const card of hand) {
+        if (card.rank === 'A') {
+            aces++;
+            score += 11;
+        } else {
+            score += cardRankValues[card.rank];
+        }
+    }
+    while (score > 21 && aces > 0) {
+        score -= 10;
+        aces--;
+    }
+    return score;
+}
 
 export function sleep(ms: number) {
     return new Promise<void>(resolve => setTimeout(resolve, ms));
