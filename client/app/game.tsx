@@ -45,7 +45,7 @@ export default function GameScreen() {
 
                 {phase === 'playerTurn' && (
                     <>
-                        <Pressable style={styles.button} onPress={() => useGameStore.getState().requestHit()}>
+                        <Pressable style={styles.button} onPress={() => useGameStore.getState().requestCard('player')}>
                             <Text style={styles.buttonText}>Ещё</Text>
                         </Pressable>
                         <Pressable style={styles.button} onPress={() => useGameStore.getState().stand()}>

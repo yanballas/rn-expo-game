@@ -8,7 +8,7 @@ import {
 } from '@/client/components/Table/helpers.functions';
 import { deckAnimation, defaultHandSlotCount } from '@/client/utils/constants';
 import { calculateScore, generateId, logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
-import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase } from '@/client/utils/types';
+import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase, Recipient } from '@/client/utils/types';
 
 const { flyingCardCount } = deckAnimation;
 const completedDealFlies = new Set<string>();
@@ -27,9 +27,9 @@ interface GameStore {
 
     startDeal: () => void;
     completeDeal: () => void;
-    completeHit: (entityId: string) => void;
-    completeEntityAnimation: (entityId: string) => void;
-    requestHit: () => void;
+    completeCard: (entityId: string, recipient: Recipient) => void;
+    completeEntityAnimation: (entityId: string, recipient: Recipient) => void;
+    requestCard: (recipient: Recipient) => void;
     stand: () => void;
     newRound: () => void;
 
@@ -117,45 +117,73 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         });
     },
 
-    completeHit: (entityId: string) => {
-        const { entities, playerHand } = get();
+    completeCard: (entityId: string, recipient: Recipient) => {
+        const { phase, entities, playerHand, dealerHand } = get();
         if (entities.length === 0) return;
 
         const entity = entities.find(entity => entity.id === entityId);
         if (!entity) return;
 
-        const newHand = [...playerHand, { ...entity.card, isFlipped: true }];
+        const isPlayer = recipient === 'player';
+        const hand = isPlayer ? playerHand : dealerHand;
 
-        set({
-            playerHand: newHand,
-            playerScore: calculateScore(newHand),
-            phase: 'playerTurn',
-        });
+        const newHand = [...hand, { ...entity.card, isFlipped: true }];
+        const newScore = calculateScore(newHand);
+
+        if (isPlayer) {
+            set({ playerHand: newHand, playerScore: newScore });
+        } else {
+            set({ dealerHand: newHand, dealerScore: newScore });
+        }
+
+        if (phase === 'hitAnimating') {
+            set({ phase: 'playerTurn' });
+        }
     },
 
-    completeEntityAnimation: (entityId: string) => {
-        const { phase, entities } = get();
+    completeEntityAnimation: (entityId: string, recipient: Recipient) => {
+        const { phase, entities, completeDeal, completeCard } = get();
 
         if (phase === 'dealing') {
             completedDealFlies.add(entityId);
             const dealEntityCount = entities.filter(entity => entity.origin === 'deal').length;
             if (completedDealFlies.size === dealEntityCount && dealEntityCount > 0) {
                 completedDealFlies.clear();
-                get().completeDeal();
+                completeDeal();
             }
-        } else if (phase === 'hitAnimating') {
-            get().completeHit(entityId);
+            return;
+        }
+
+        const isCardCompletionPhase = phase === 'hitAnimating' || phase === 'dealerTurn';
+        if (isCardCompletionPhase) {
+            completeCard(entityId, recipient);
         }
     },
 
-    requestHit: () => {
-        const { phase, playerHand, playerPositions, pool } = get();
+    requestCard: (recipient: Recipient) => {
+        const { phase, playerHand, dealerHand, playerPositions, dealerPositions, pool, entities } = get();
 
-        if (phase !== 'playerTurn') return;
+        if (recipient === 'player' && phase !== 'playerTurn') return;
+        if (recipient === 'dealer' && phase !== 'dealerTurn') return;
         if (pool.length === 0) return;
 
-        const slotIndex = playerHand.length;
-        const target = resolveSlotPosition(playerPositions, slotIndex);
+        let hand: typeof playerHand;
+        let positions: typeof playerPositions;
+        let nextPhase: typeof phase;
+
+        if (recipient === 'player') {
+            hand = playerHand;
+            positions = playerPositions;
+            nextPhase = 'hitAnimating';
+        } else {
+            hand = dealerHand;
+            positions = dealerPositions;
+            nextPhase = 'dealerTurn';
+        }
+
+        const slotIndex = hand.length;
+
+        const target = resolveSlotPosition(positions, slotIndex);
         if (!target) return;
 
         const { pickedCards, remainingCards } = takeCardsFromPool(pool, 1);
@@ -166,13 +194,17 @@ export const useGameStore = create<GameStore>()((set, get) => ({
             id: generateId(),
             card: { ...card, isFlipped: false },
             origin: 'hit',
-            recipient: 'player',
+            recipient,
             slotIndex,
             targetPosition: target,
             animationChannel: 0,
         };
 
-        set({ entities: [...get().entities, entity], pool: remainingCards, phase: 'hitAnimating' });
+        set({
+            entities: [...entities, entity],
+            pool: remainingCards,
+            phase: nextPhase,
+        });
 
         // logs
         logDeckRemaining(remainingCards);
@@ -194,8 +226,27 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     },
 
     newRound: () => {
-        if (get().phase !== 'roundEnd') return;
-        set({ playerHand: [], dealerHand: [], playerScore: 0, dealerScore: 0, entities: [], phase: 'idle' });
+        const { phase, entities } = get();
+        if (phase !== 'roundEnd') return;
+
+        const newPool = buildDeck();
+        completedDealFlies.clear();
+
+        // logs
+        if (entities.length > 0) logEntitiesCleared();
+
+        set({
+            playerHand: [],
+            dealerHand: [],
+            playerScore: 0,
+            dealerScore: 0,
+            entities: [],
+            pool: newPool,
+            phase: 'idle',
+        });
+
+        // logs
+        logDeckRemaining(newPool);
     },
 
     setDealerPositions: (positions: CardPosition[]) => set({ dealerPositions: positions }),

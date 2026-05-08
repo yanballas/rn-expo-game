@@ -40,7 +40,7 @@ export function TableCard({ entity }: TableCardProps) {
 
         const flipTimeoutId = setTimeout(() => {
             setFlipped(isFlippedAfterFly(entity));
-            useGameStore.getState().completeEntityAnimation(entity.id);
+            useGameStore.getState().completeEntityAnimation(entity.id, entity.recipient);
         }, totalTime);
 
         return () => {
