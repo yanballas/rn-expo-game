@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +18,10 @@ export default function GameScreen() {
     const phase = useGameStore(store => store.phase);
     const playerScore = useGameStore(store => store.playerScore);
     const dealerScore = useGameStore(store => store.dealerScore);
+
+    useEffect(() => {
+        useGameStore.getState().resetGame();
+    }, []);
 
     return (
         <View style={styles.container}>
@@ -60,9 +65,14 @@ export default function GameScreen() {
                     </Pressable>
                 )}
 
-                <Pressable style={styles.button} onPress={() => router.push({ pathname: '/menu' })}>
-                    <Text style={styles.buttonText}>Назад в меню</Text>
-                </Pressable>
+                {(phase === 'idle' || phase === 'roundEnd') && (
+                    <Pressable style={styles.button} onPress={() => {
+                        useGameStore.getState().resetGame();
+                        router.push({ pathname: '/menu' });
+                    }}>
+                        <Text style={styles.buttonText}>Назад в меню</Text>
+                    </Pressable>
+                )}
             </View>
         </View>
     );

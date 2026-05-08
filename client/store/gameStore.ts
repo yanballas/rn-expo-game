@@ -2,7 +2,8 @@ import { create } from 'zustand';
 
 import { buildDeck, isFlippedAfterFly, resolveSlotPosition, takeCardsFromPool } from '@/client/components/Table/helpers.functions';
 import { deckAnimation, defaultHandSlotCount } from '@/client/utils/constants';
-import { calculateScore, generateId, logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
+import { calculateScore, generateId } from '@/client/utils/functions';
+import { logDeckRemaining, logEntitiesCleared, logGameReset, logStoreState } from '@/client/utils/logger';
 import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase, Recipient } from '@/client/utils/types';
 
 const { flyingCardCount } = deckAnimation;
@@ -31,6 +32,7 @@ interface GameStore {
     endDealerTurn: () => void;
     newRound: () => void;
 
+    resetGame: () => void;
     setDealerPositions: (positions: CardPosition[]) => void;
     setPlayerPositions: (positions: CardPosition[]) => void;
     setDeckPosition: (position: CardPosition) => void;
@@ -283,6 +285,37 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
         // logs
         logDeckRemaining(newPool);
+    },
+
+    resetGame: () => {
+        const state = get();
+
+        // logs
+        logStoreState({
+            phase: state.phase,
+            playerScore: state.playerScore,
+            dealerScore: state.dealerScore,
+            playerHandCount: state.playerHand.length,
+            dealerHandCount: state.dealerHand.length,
+            entityCount: state.entities.length,
+            poolCount: state.pool.length,
+        });
+
+        completedDealFlies.clear();
+        logGameReset();
+
+        set({
+            phase: 'idle',
+            playerHand: [],
+            dealerHand: [],
+            playerScore: 0,
+            dealerScore: 0,
+            entities: [],
+            pool: buildDeck(),
+            dealerPositions: [],
+            playerPositions: [],
+            deckPosition: { x: 0, y: 0 },
+        });
     },
 
     setDealerPositions: (positions: CardPosition[]) => set({ dealerPositions: positions }),
