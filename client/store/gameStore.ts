@@ -1,11 +1,6 @@
 import { create } from 'zustand';
 
-import {
-    buildDeck,
-    isFlippedAfterFly,
-    resolveSlotPosition,
-    takeCardsFromPool,
-} from '@/client/components/Table/helpers.functions';
+import { buildDeck, isFlippedAfterFly, resolveSlotPosition, takeCardsFromPool } from '@/client/components/Table/helpers.functions';
 import { deckAnimation, defaultHandSlotCount } from '@/client/utils/constants';
 import { calculateScore, generateId, logDeckRemaining, logEntitiesCleared } from '@/client/utils/functions';
 import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase, Recipient } from '@/client/utils/types';
@@ -31,6 +26,9 @@ interface GameStore {
     completeEntityAnimation: (entityId: string, recipient: Recipient) => void;
     requestCard: (recipient: Recipient) => void;
     stand: () => void;
+    continueDealerTurn: (score: number) => void;
+    showDealerHiddenCard: () => void;
+    endDealerTurn: () => void;
     newRound: () => void;
 
     setDealerPositions: (positions: CardPosition[]) => void;
@@ -118,7 +116,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     },
 
     completeCard: (entityId: string, recipient: Recipient) => {
-        const { phase, entities, playerHand, dealerHand } = get();
+        const { phase, entities, playerHand, dealerHand, dealerScore, showDealerHiddenCard, continueDealerTurn } = get();
         if (entities.length === 0) return;
 
         const entity = entities.find(entity => entity.id === entityId);
@@ -137,7 +135,19 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         }
 
         if (phase === 'hitAnimating') {
-            set({ phase: 'playerTurn' });
+            if (newScore <= 21) {
+                set({ phase: 'playerTurn' });
+                return;
+            }
+
+            showDealerHiddenCard();
+            set({ phase: 'dealerTurn' });
+            continueDealerTurn(dealerScore);
+            return;
+        }
+
+        if (phase === 'dealerTurn') {
+            continueDealerTurn(newScore);
         }
     },
 
@@ -211,18 +221,44 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     },
 
     stand: () => {
-        const { phase, dealerHand, entities } = get();
+        const { phase, dealerScore, showDealerHiddenCard, continueDealerTurn } = get();
         if (phase !== 'playerTurn') return;
 
-        const updatedDealerHand = dealerHand.map((card, i) => (i === 1 ? { ...card, isFlipped: true } : card));
+        showDealerHiddenCard();
+        set({ phase: 'dealerTurn' });
+        continueDealerTurn(dealerScore);
+    },
 
-        const updatedEntities = entities.map(entity =>
-            entity.recipient === 'dealer' && entity.slotIndex === 1
-                ? { ...entity, card: { ...entity.card, isFlipped: true } }
-                : entity,
-        );
+    continueDealerTurn: (score: number) => {
+        const { requestCard, endDealerTurn } = get();
 
-        set({ dealerHand: updatedDealerHand, entities: updatedEntities, phase: 'roundEnd' });
+        if (score >= 17) {
+            endDealerTurn();
+        } else {
+            requestCard('dealer');
+        }
+    },
+
+    showDealerHiddenCard: () => {
+        const { dealerHand, entities } = get();
+
+        const updatedDealerHand = dealerHand.map((dealerCard, cardIndex) => {
+            const isDealerSecondCard = cardIndex === 1;
+            if (!isDealerSecondCard) return dealerCard;
+            return { ...dealerCard, isFlipped: true };
+        });
+
+        const updatedEntities = entities.map(cardEntity => {
+            const shouldFlipDealerSecondCard = cardEntity.recipient === 'dealer' && cardEntity.slotIndex === 1;
+            if (!shouldFlipDealerSecondCard) return cardEntity;
+            return { ...cardEntity, card: { ...cardEntity.card, isFlipped: true } };
+        });
+
+        set({ dealerHand: updatedDealerHand, entities: updatedEntities });
+    },
+
+    endDealerTurn: () => {
+        set({ phase: 'roundEnd' });
     },
 
     newRound: () => {
