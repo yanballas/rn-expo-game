@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { scheduleOnRN } from 'react-native-worklets';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { BackCard } from './BackCard';
@@ -18,10 +20,24 @@ const rotatePositions = {
     },
 };
 
-function AnimatedCardFace({ children, isVisible, rotateY, style }: AnimatedCardFaceType) {
+function AnimatedCardFace({ children, isVisible, rotateY, onFlipEnd, style }: AnimatedCardFaceType) {
+    const onFlipEndRef = useRef(onFlipEnd);
+    onFlipEndRef.current = onFlipEnd;
+
     const animatedStyle = useAnimatedStyle(() => {
         return {
-            transform: [{ perspective: 1000 }, { rotateY: withTiming(rotateY, { duration: flipTransition.duration }) }],
+            transform: [
+                {
+                    perspective: 1000,
+                },
+                {
+                    rotateY: withTiming(rotateY, { duration: flipTransition.duration }, finished => {
+                        if (finished && onFlipEndRef.current) {
+                            scheduleOnRN(onFlipEndRef.current);
+                        }
+                    }),
+                },
+            ],
         };
     }, [rotateY]);
 
@@ -32,12 +48,19 @@ function AnimatedCardFace({ children, isVisible, rotateY, style }: AnimatedCardF
     );
 }
 
-export function FullCard({ card: { rank, suit, isFlipped = true } }: { card: FullCardType }) {
+export function FullCard({
+    card: { rank, suit, isFlipped = true },
+    onFlipEnd,
+}: {
+    card: FullCardType;
+    onFlipEnd?: () => void;
+}) {
     return (
         <View style={styles.container}>
             <AnimatedCardFace
                 isVisible={isFlipped}
                 rotateY={isFlipped ? rotatePositions.front.start : rotatePositions.front.end}
+                onFlipEnd={onFlipEnd}
                 style={styles.cardFront}
             >
                 <FrontCard card={{ rank, suit }} />
@@ -45,6 +68,7 @@ export function FullCard({ card: { rank, suit, isFlipped = true } }: { card: Ful
             <AnimatedCardFace
                 isVisible={!isFlipped}
                 rotateY={isFlipped ? rotatePositions.back.start : rotatePositions.back.end}
+                onFlipEnd={onFlipEnd}
                 style={styles.cardBack}
             >
                 <BackCard />

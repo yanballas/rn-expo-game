@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
 import { useGameStore } from '@/client/store';
 import { cardStyles, deckAnimation, deckCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
+import { onFlipComplete, onFlyComplete } from '@/client/utils/functions';
 import type { CardEntity } from '@/client/utils/types';
-import { isFlippedAfterFly } from './helpers.functions';
 
 const { duration, sequenceInterval, easingBezier } = deckAnimation;
 const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], easingBezier[3]);
@@ -23,47 +23,44 @@ export function TableCard({ entity }: TableCardProps) {
     const translateX = useSharedValue(deckCardOriginInset);
     const translateY = useSharedValue(deckCardOriginInset);
 
-    const [isFlipped, setFlipped] = useState(false);
     const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - entity.animationChannel);
 
     useEffect(() => {
         const delay = entity.animationChannel * sequenceInterval;
         const flyDuration = duration;
-        const totalTime = delay + flyDuration;
 
-        translateX.value = withDelay(delay, withTiming(deltaX, { duration: flyDuration, easing }));
+        translateX.value = withDelay(delay, withTiming(deltaX, { duration: flyDuration, easing }, finished => {
+            if (finished === true) {
+                runOnJS(onFlyComplete)(entity.id);
+            }
+        }));
         translateY.value = withDelay(delay, withTiming(deltaY, { duration: flyDuration, easing }));
 
         const zIndexTimeoutId = setTimeout(() => {
             setZIndex(TableCardInitialZIndex + entity.animationChannel);
         }, delay);
 
-        const flipTimeoutId = setTimeout(() => {
-            setFlipped(isFlippedAfterFly(entity));
-            useGameStore.getState().completeEntityAnimation(entity.id, entity.recipient);
-        }, totalTime);
-
         return () => {
             clearTimeout(zIndexTimeoutId);
-            clearTimeout(flipTimeoutId);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    useEffect(() => {
-        if (entity.card.isFlipped) {
-            setFlipped(true);
-        }
-    }, [entity.card.isFlipped]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
     }));
 
+    const handleFlipEnd = () => {
+        onFlipComplete(entity.id);
+    };
+
     return (
         <Animated.View style={[styles.cardAnchor, { zIndex }]}>
             <Animated.View style={[styles.cardMotion, animatedStyle]}>
-                <FullCard card={{ rank: entity.card.rank, suit: entity.card.suit, isFlipped }} />
+                <FullCard
+                    card={{ rank: entity.card.rank, suit: entity.card.suit, isFlipped: entity.card.isFlipped }}
+                    onFlipEnd={handleFlipEnd}
+                />
             </Animated.View>
         </Animated.View>
     );

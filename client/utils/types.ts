@@ -17,6 +17,7 @@ export interface AnimatedCardFace {
     children: ReactNode;
     isVisible: boolean;
     rotateY: string;
+    onFlipEnd?: () => void;
     style?: StyleProp<ViewStyle>;
 }
 

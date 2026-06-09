@@ -25,7 +25,79 @@ export function sleep(ms: number) {
 
 export function generateId(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = (Math.random() * 16) | 0;
-        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+        const randomValue = (Math.random() * 16) | 0;
+        return (c === 'x' ? randomValue : (randomValue & 0x3) | 0x8).toString(16);
     });
+}
+
+const flyResolvers = new Map<string, () => void>();
+const flipResolvers = new Map<string, () => void>();
+const dealerCardResolvers = new Map<string, () => void>();
+
+export function onFlyComplete(entityId: string) {
+    flyResolvers.get(entityId)?.();
+    flyResolvers.delete(entityId);
+}
+
+export function onFlipComplete(entityId: string) {
+    flipResolvers.get(entityId)?.();
+    flipResolvers.delete(entityId);
+}
+
+let isCancelled = false;
+
+export function cancelRunningAnimation() {
+    isCancelled = true;
+    clearAnimationResolvers();
+    dealerCardResolvers.clear();
+}
+
+async function runWithTimeout(promise: Promise<void>, timeoutMs: number, label: string): Promise<void> {
+    const timeoutId = setTimeout(() => {
+        throw new Error(`Animation timeout: ${label}`);
+    }, timeoutMs);
+    try {
+        await promise;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+export async function runAsync(animationFunction: () => Promise<void>, label: string = 'animation') {
+    isCancelled = false;
+    try {
+        await animationFunction();
+    } catch (error) {
+        if (isCancelled) return;
+        console.error(`[Animation Error] ${label}:`, error);
+    }
+}
+
+export function clearAnimationResolvers() {
+    flyResolvers.clear();
+    flipResolvers.clear();
+    dealerCardResolvers.clear();
+}
+
+export function clearDealerCardResolvers() {
+    dealerCardResolvers.clear();
+}
+
+export function notifyNextDealerCard() {
+    dealerCardResolvers.get('next')?.();
+    dealerCardResolvers.delete('next');
+}
+
+const animationTimeoutMs = 5000;
+
+export async function waitForFly(entityId: string): Promise<void> {
+    await runWithTimeout(new Promise<void>(resolve => flyResolvers.set(entityId, resolve)), animationTimeoutMs, `fly:${entityId}`);
+}
+
+export async function waitForFlip(entityId: string): Promise<void> {
+    await runWithTimeout(new Promise<void>(resolve => flipResolvers.set(entityId, resolve)), animationTimeoutMs, `flip:${entityId}`);
+}
+
+export async function waitForNextDealerCard(): Promise<void> {
+    await runWithTimeout(new Promise<void>(resolve => dealerCardResolvers.set('next', resolve)), animationTimeoutMs, 'dealerCard:next');
 }
