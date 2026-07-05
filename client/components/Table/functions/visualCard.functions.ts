@@ -39,7 +39,6 @@ export function createVisualCard(
             y: deck.y + deckCardOriginInset,
         },
         targetPosition,
-        layoutMode: 'flying',
     };
 }
 

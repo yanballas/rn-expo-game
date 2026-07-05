@@ -141,20 +141,6 @@ export function useBlackjackAnimationController({
         setInteractionLocked(false);
     }, [resolveAllPendingAnimations, setInteractionLocked]);
 
-    const settleCards = useCallback(
-        (cardIds: string[]) => {
-            const cardIdSet = new Set(cardIds);
-
-            setVisualCards(cards =>
-                cards.map(card => {
-                    if (!cardIdSet.has(card.id)) return card;
-                    return { ...card, layoutMode: 'settled' };
-                }),
-            );
-        },
-        [setVisualCards],
-    );
-
     const flipCards = useCallback(
         async (operationId: number, cardIds: string[]): Promise<TableOperationResult> => {
             const flipPromises = cardIds.map(cardId => waitForFlip(cardId));
@@ -187,10 +173,9 @@ export function useBlackjackAnimationController({
             if (failedResult) return failedResult;
             if (operationIdRef.current !== operationId) return operationCancelled();
 
-            settleCards(cards.map(card => card.id));
             return operationOk();
         },
-        [setVisualCards, settleCards, waitForFly],
+        [setVisualCards, waitForFly],
     );
 
     const runDealerSequence = useCallback(

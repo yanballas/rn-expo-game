@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
 import { cardStyles, deckAnimation, TableCardInitialZIndex } from '@/client/utils/constants';
-import type { CardPosition } from '@/client/utils/types';
 
 import type { TableVisualCard } from './types/table.types';
 
@@ -13,23 +12,19 @@ const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], 
 
 interface TableCardProps {
     visualCard: TableVisualCard;
-    currentPosition: CardPosition;
     onFlyEnd: (cardId: string) => void;
     onFlipEnd: (cardId: string) => void;
 }
 
-export function TableCard({ visualCard, currentPosition, onFlyEnd, onFlipEnd }: TableCardProps) {
+export function TableCard({ visualCard, onFlyEnd, onFlipEnd }: TableCardProps) {
     const deltaX = visualCard.targetPosition.x - visualCard.startPosition.x;
     const deltaY = visualCard.targetPosition.y - visualCard.startPosition.y;
 
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
-
-    const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - visualCard.sequenceIndex);
+    const zIndex = useSharedValue(TableCardInitialZIndex - visualCard.sequenceIndex);
 
     useEffect(() => {
-        if (visualCard.layoutMode === 'settled') return;
-
         const delay = visualCard.sequenceIndex * sequenceInterval;
 
         translateX.value = withDelay(delay, withTiming(deltaX, { duration, easing }, finished => {
@@ -38,33 +33,30 @@ export function TableCard({ visualCard, currentPosition, onFlyEnd, onFlipEnd }: 
             }
         }));
         translateY.value = withDelay(delay, withTiming(deltaY, { duration, easing }));
-
-        const zIndexTimeoutId = setTimeout(() => {
-            setZIndex(TableCardInitialZIndex + visualCard.sequenceIndex);
-        }, delay);
-
-        return () => {
-            clearTimeout(zIndexTimeoutId);
-        };
+        zIndex.value = withDelay(delay, withTiming(TableCardInitialZIndex + visualCard.sequenceIndex, { duration: 0 }));
         // The flight intentionally uses the start/target snapshot from the visual card creation moment.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const animatedStyle = useAnimatedStyle(() => {
-        if (visualCard.layoutMode === 'settled') {
-            return {
-                transform: [{ translateX: 0 }, { translateY: 0 }],
-            };
-        }
-
         return {
             transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
+            zIndex: zIndex.value,
         };
-    }, [visualCard.layoutMode]);
+    });
 
     return (
-        <Animated.View style={[styles.cardAnchor, { left: currentPosition.x, top: currentPosition.y, zIndex }]}>
-            <Animated.View style={[styles.cardMotion, animatedStyle]}>
+        <Animated.View
+            style={[
+                styles.cardAnchor,
+                {
+                    left: visualCard.startPosition.x,
+                    top: visualCard.startPosition.y,
+                },
+                animatedStyle,
+            ]}
+        >
+            <Animated.View style={styles.cardMotion}>
                 <FullCard
                     card={{
                         rank: visualCard.card.rank,

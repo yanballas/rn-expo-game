@@ -6,7 +6,6 @@ import type { CardLayout, CardPosition, VisualCard } from '@/client/utils/types'
 export type TableVisualCard = VisualCard & {
     startPosition: CardPosition;
     targetPosition: CardPosition;
-    layoutMode: 'flying' | 'settled';
 };
 
 export interface TableHandle {

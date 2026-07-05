@@ -14,7 +14,7 @@ import {
 } from '@/client/utils/constants';
 
 import { useBlackjackAnimationController } from './hooks/useBlackjackAnimationController';
-import { resolveCardPosition, useTableLayout } from './hooks/useTableLayout';
+import { useTableLayout } from './hooks/useTableLayout';
 import { TableCard } from './TableCard';
 import type { TableHandle } from './types/table.types';
 
@@ -80,20 +80,10 @@ export const Table = forwardRef<TableHandle, TableProps>(function Table({ onInte
             </View>
 
             {animationController.visualCards.map(visualCard => {
-                const targetPosition = resolveCardPosition(
-                    tableLayout.layout,
-                    visualCard.recipient,
-                    visualCard.slotIndex,
-                );
-                const currentPosition = visualCard.layoutMode === 'settled' && targetPosition
-                    ? targetPosition
-                    : visualCard.startPosition;
-
                 return (
                     <TableCard
                         key={visualCard.id}
                         visualCard={visualCard}
-                        currentPosition={currentPosition}
                         onFlyEnd={animationController.handleFlyEnd}
                         onFlipEnd={animationController.handleFlipEnd}
                     />
