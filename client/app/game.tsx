@@ -1,14 +1,13 @@
+import { useEffect } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Background } from '@/client/components/Background';
 import { Hand } from '@/client/components/Hand';
 import { Table } from '@/client/components/Table/Table';
-import { colors, defaultHandSlotCount } from '@/client/utils/constants';
-import { logDealerHand, logPlayerHand } from '@/client/utils/functions';
-import type { CardPosition, FullCard, HitRequest } from '@/client/utils/types';
+import { useGameStore } from '@/client/store';
+import { bottomAreaPosition, colors, topAreaPosition } from '@/client/utils/constants';
 
 import bgItemsPng from '@/client/assets/images/background/bg_items.png';
 import bgMainPng from '@/client/assets/images/background/bg_main.png';
@@ -16,57 +15,12 @@ import bgPatternPng from '@/client/assets/images/background/bg_pattern.png';
 
 export default function GameScreen() {
     const router = useRouter();
-    const [isDealing, setIsDealing] = useState(false);
-    const [playerCards, setPlayerCards] = useState<FullCard[]>([]);
-    const [dealerCards, setDealerCards] = useState<FullCard[]>([]);
-    const [dealerPositions, setDealerPositions] = useState<CardPosition[]>([]);
-    const [playerPositions, setPlayerPositions] = useState<CardPosition[]>([]);
-    const [hitRequest, setHitRequest] = useState<HitRequest | null>(null);
+    const phase = useGameStore(store => store.phase);
+    const playerScore = useGameStore(store => store.playerScore);
+    const dealerScore = useGameStore(store => store.dealerScore);
 
-    // logs
     useEffect(() => {
-        logPlayerHand(playerCards);
-    }, [playerCards]);
-
-    // logs
-    useEffect(() => {
-        logDealerHand(dealerCards);
-    }, [dealerCards]);
-
-    const handleDeal = useCallback(() => {
-        setIsDealing(true);
-    }, []);
-
-    const handleDealComplete = useCallback((dealtDealer: FullCard[], dealtPlayer: FullCard[]) => {
-        setDealerCards(dealtDealer);
-        setPlayerCards(dealtPlayer);
-        setIsDealing(false);
-    }, []);
-
-    const handleDealerLayout = useCallback((positions: CardPosition[]) => {
-        setDealerPositions(positions);
-    }, []);
-
-    const handlePlayerLayout = useCallback((positions: CardPosition[]) => {
-        setPlayerPositions(positions);
-    }, []);
-
-    const handlePlayerHit = useCallback(() => {
-        if (playerCards.length < defaultHandSlotCount || isDealing || hitRequest) return;
-        setHitRequest({
-            id: Date.now(),
-            recipient: 'player',
-            slotIndex: playerCards.length,
-        });
-    }, [playerCards.length, isDealing, hitRequest]);
-
-    const handleHitComplete = useCallback((recipient: HitRequest['recipient'], card: FullCard) => {
-        if (recipient === 'player') {
-            setPlayerCards(prev => [...prev, card]);
-        } else {
-            setDealerCards(prev => [...prev, card]);
-        }
-        setHitRequest(null);
+        useGameStore.getState().resetGame();
     }, []);
 
     return (
@@ -75,45 +29,50 @@ export default function GameScreen() {
             <Background source={bgItemsPng} />
             <Image source={bgPatternPng} style={styles.backgroundImagePattern} contentFit="contain" />
 
-            <View style={styles.topArea}>
-                <Hand count={dealerCards.length} label="Дилер" onCardLayout={handleDealerLayout} />
+            <View style={[styles.topArea]}>
+                <Hand side="dealer" />
+                <Text style={styles.scoreTop}>{dealerScore}</Text>
             </View>
 
-            <View style={styles.bottomArea}>
-                <Hand count={playerCards.length} label="Игрок" onCardLayout={handlePlayerLayout} />
+            <View style={[styles.bottomArea]}>
+                <Hand side="player" />
+                <Text style={styles.scoreBottom}>{playerScore}</Text>
             </View>
 
-            <Table
-                isDealing={isDealing}
-                dealerPositions={dealerPositions}
-                playerPositions={playerPositions}
-                onDealComplete={handleDealComplete}
-                hitRequest={hitRequest}
-                onHitComplete={handleHitComplete}
-            />
+            <Table />
 
             <View style={styles.buttonRow}>
-                <Pressable
-                    style={[styles.button, isDealing && styles.buttonDisabled]}
-                    disabled={isDealing}
-                    onPress={handleDeal}
-                >
-                    <Text style={styles.buttonText}>Раздать</Text>
-                </Pressable>
-                <Pressable
-                    style={[
-                        styles.button,
-                        (playerCards.length < defaultHandSlotCount || isDealing || Boolean(hitRequest)) &&
-                            styles.buttonDisabled,
-                    ]}
-                    disabled={playerCards.length < defaultHandSlotCount || isDealing || Boolean(hitRequest)}
-                    onPress={handlePlayerHit}
-                >
-                    <Text style={styles.buttonText}>Ещё</Text>
-                </Pressable>
-                <Pressable style={styles.button} onPress={() => router.push({ pathname: '/menu' })}>
-                    <Text style={styles.buttonText}>Назад в меню</Text>
-                </Pressable>
+                {phase === 'idle' && (
+                    <Pressable style={styles.button} onPress={() => useGameStore.getState().startDeal()}>
+                        <Text style={styles.buttonText}>Раздать</Text>
+                    </Pressable>
+                )}
+
+                {phase === 'playerTurn' && (
+                    <>
+                        <Pressable style={styles.button} onPress={() => useGameStore.getState().requestCard('player')}>
+                            <Text style={styles.buttonText}>Ещё</Text>
+                        </Pressable>
+                        <Pressable style={styles.button} onPress={() => useGameStore.getState().stand()}>
+                            <Text style={styles.buttonText}>Стоять</Text>
+                        </Pressable>
+                    </>
+                )}
+
+                {phase === 'roundEnd' && (
+                    <Pressable style={styles.button} onPress={() => useGameStore.getState().newRound()}>
+                        <Text style={styles.buttonText}>Новая раздача</Text>
+                    </Pressable>
+                )}
+
+                {(phase === 'idle' || phase === 'roundEnd') && (
+                    <Pressable style={styles.button} onPress={() => {
+                        useGameStore.getState().resetGame();
+                        router.push({ pathname: '/menu' });
+                    }}>
+                        <Text style={styles.buttonText}>Назад в меню</Text>
+                    </Pressable>
+                )}
             </View>
         </View>
     );
@@ -136,17 +95,17 @@ const styles = StyleSheet.create({
     },
     topArea: {
         position: 'absolute',
-        top: 60,
-        left: 0,
-        right: 0,
         alignItems: 'center',
+        top: topAreaPosition.top,
+        left: topAreaPosition.left,
+        right: topAreaPosition.right,
     },
     bottomArea: {
         position: 'absolute',
-        bottom: 160,
-        left: 0,
-        right: 0,
         alignItems: 'center',
+        bottom: bottomAreaPosition.bottom,
+        left: bottomAreaPosition.left,
+        right: bottomAreaPosition.right,
     },
     buttonRow: {
         position: 'absolute',
@@ -157,14 +116,27 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 16,
     },
+    scoreTop: {
+        position: 'absolute',
+        top: -24,
+        right: 0,
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    scoreBottom: {
+        position: 'absolute',
+        bottom: -24,
+        right: 0,
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: '700',
+    },
     button: {
         paddingHorizontal: 18,
         paddingVertical: 12,
         borderRadius: 12,
         backgroundColor: '#1f2937',
-    },
-    buttonDisabled: {
-        opacity: 0.5,
     },
     buttonText: {
         color: '#ffffff',

@@ -1,118 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { BackCard } from '@/client/components/Card/BackCard';
-import { cardStyles, deckLeftInset, deckStackOffset, deckTopCardOriginInset } from '@/client/utils/constants';
-import { logDeckRemaining } from '@/client/utils/functions';
-import type { CardEntity, CardPosition, FullCard, HitRequest, Recipient } from '@/client/utils/types';
+import { useGameStore } from '@/client/store';
+import { cardStyles, deckCardOriginInset, deckPosition, deckStackOffset } from '@/client/utils/constants';
 
-import { buildDeck, isFlippedAfterFly } from './helpers.functions';
-import { useDealCards, useHitCard } from './Table.hooks';
 import { TableCard } from './TableCard';
 
-const cardHalfHeightPx = Math.round(cardStyles.height / 2);
-
-interface TableProps {
-    isDealing: boolean;
-    dealerPositions: CardPosition[];
-    playerPositions: CardPosition[];
-    onDealComplete: (dealerCards: FullCard[], playerCards: FullCard[]) => void;
-    hitRequest: HitRequest | null;
-    onHitComplete: (recipient: Recipient, card: FullCard) => void;
-}
-
-export function Table({
-    isDealing,
-    dealerPositions,
-    playerPositions,
-    onDealComplete,
-    hitRequest,
-    onHitComplete,
-}: TableProps) {
+export function Table() {
     const deckRef = useRef<View>(null);
-    const [deckPosition, setDeckPosition] = useState<CardPosition>({ x: 0, y: 0 });
-    const [deckReady, setDeckReady] = useState(false);
-    const poolRef = useRef(buildDeck());
-    const uniqueId = useRef(0);
-    const dealerPositionsRef = useRef(dealerPositions);
-    dealerPositionsRef.current = dealerPositions;
-    const playerPositionsRef = useRef(playerPositions);
-    playerPositionsRef.current = playerPositions;
+    const entities = useGameStore(store => store.entities);
 
-    const [entities, setEntities] = useState<CardEntity[]>([]);
-
-    const entitiesRef = useRef(entities);
-    entitiesRef.current = entities;
-
-    const pendingDealIdsRef = useRef<Set<number>>(new Set());
-
-    const handleDealStart = useCallback(() => {
-        pendingDealIdsRef.current.clear();
-    }, []);
-
-    const handleCardComplete = useCallback(
-        (entityId: number) => {
-            const entity = entitiesRef.current.find(e => e.id === entityId);
-            if (!entity) return;
-
-            // первая раздача завершена
-            if (entity.origin === 'deal') {
-                pendingDealIdsRef.current.add(entityId);
-                const totalDealEntities = entitiesRef.current.filter(e => e.origin === 'deal').length;
-                if (pendingDealIdsRef.current.size === totalDealEntities && totalDealEntities > 0) {
-                    pendingDealIdsRef.current.clear();
-                    // получаем все карты раздачи
-                    const dealEntities = entitiesRef.current.filter(entity => entity.origin === 'deal');
-                    const dealerCards = dealEntities.filter(entity => entity.recipient === 'dealer');
-                    const playerCards = dealEntities.filter(entity => entity.recipient === 'player');
-                    onDealComplete(
-                        dealerCards.map(entity => ({ ...entity.card, isFlipped: isFlippedAfterFly(entity) })),
-                        playerCards.map(entity => ({ ...entity.card, isFlipped: isFlippedAfterFly(entity) })),
-                    );
-                }
-                return;
-            }
-
-            // хит завершен
-            onHitComplete(entity.recipient, { ...entity.card, isFlipped: true });
-        },
-        [onDealComplete, onHitComplete],
-    );
-
-    const handleDeckLayout = useCallback((_e: LayoutChangeEvent) => {
+    const handleDeckLayout = () => {
         deckRef.current?.measureInWindow((x: number, y: number) => {
-            setDeckPosition({ x, y });
-            setDeckReady(true);
+            useGameStore.getState().setDeckPosition({ x, y });
         });
-    }, []);
-
-    // logs
-    useEffect(() => {
-        if (!deckReady) return;
-        logDeckRemaining(poolRef.current);
-    }, [deckReady]);
-
-    useDealCards({
-        isDealing,
-        deckReady,
-        dealerPositionsRef,
-        playerPositionsRef,
-        poolRef,
-        uniqueId,
-        setEntities,
-        onDealStart: handleDealStart,
-    });
-
-    useHitCard({
-        hitRequest,
-        deckReady,
-        isDealing,
-        dealerPositionsRef,
-        playerPositionsRef,
-        poolRef,
-        uniqueId,
-        setEntities,
-    });
+    };
 
     return (
         <View style={styles.wrapper}>
@@ -127,12 +30,7 @@ export function Table({
                     <BackCard />
                 </View>
                 {entities.map(entity => (
-                    <TableCard
-                        key={entity.id}
-                        entity={entity}
-                        deckPosition={deckPosition}
-                        onComplete={handleCardComplete}
-                    />
+                    <TableCard key={entity.id} entity={entity} />
                 ))}
             </View>
         </View>
@@ -143,6 +41,8 @@ const styles = StyleSheet.create({
     wrapper: {
         position: 'absolute',
         left: 0,
+        width: '100%',
+        height: '100%',
         right: 0,
         top: 0,
         bottom: 0,
@@ -150,11 +50,10 @@ const styles = StyleSheet.create({
     },
     tableAnchor: {
         position: 'absolute',
-        left: deckLeftInset,
-        top: '50%',
+        left: deckPosition.left,
+        top: deckPosition.top,
         width: cardStyles.width,
         height: cardStyles.height,
-        marginTop: -cardHalfHeightPx,
     },
     stackCard: {
         position: 'absolute',
@@ -174,8 +73,8 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     stackCard3: {
-        top: deckTopCardOriginInset,
-        left: deckTopCardOriginInset,
+        top: deckCardOriginInset,
+        left: deckCardOriginInset,
         zIndex: 3,
     },
 });

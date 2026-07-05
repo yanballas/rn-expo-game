@@ -1,53 +1,47 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
-import { cardStyles, deckAnimation, deckTopCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
-import type { CardEntity, CardPosition } from '@/client/utils/types';
-import { isFlippedAfterFly } from './helpers.functions';
+import { useGameStore } from '@/client/store';
+import { cardStyles, deckAnimation, deckCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
+import { onFlipComplete, onFlyComplete } from '@/client/utils/functions';
+import type { CardEntity } from '@/client/utils/types';
 
 const { duration, sequenceInterval, easingBezier } = deckAnimation;
 const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], easingBezier[3]);
 
 interface TableCardProps {
     entity: CardEntity;
-    deckPosition: CardPosition;
-    onComplete: (entityId: number) => void;
 }
 
-export function TableCard({ entity, deckPosition, onComplete }: TableCardProps) {
+export function TableCard({ entity }: TableCardProps) {
+    const deckPosition = useGameStore(store => store.deckPosition);
     const deltaX = entity.targetPosition.x - deckPosition.x;
     const deltaY = entity.targetPosition.y - deckPosition.y;
 
-    const translateX = useSharedValue(deckTopCardOriginInset);
-    const translateY = useSharedValue(deckTopCardOriginInset);
-    const [isFlipped, setFlipped] = useState(false);
-    const onCompleteRef = useRef(onComplete);
-    onCompleteRef.current = onComplete;
+    const translateX = useSharedValue(deckCardOriginInset);
+    const translateY = useSharedValue(deckCardOriginInset);
 
     const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - entity.animationChannel);
 
     useEffect(() => {
         const delay = entity.animationChannel * sequenceInterval;
         const flyDuration = duration;
-        const totalTime = delay + flyDuration;
 
-        translateX.value = withDelay(delay, withTiming(deltaX, { duration: flyDuration, easing }));
+        translateX.value = withDelay(delay, withTiming(deltaX, { duration: flyDuration, easing }, finished => {
+            if (finished === true) {
+                runOnJS(onFlyComplete)(entity.id);
+            }
+        }));
         translateY.value = withDelay(delay, withTiming(deltaY, { duration: flyDuration, easing }));
 
         const zIndexTimeoutId = setTimeout(() => {
-            setZIndex(TableCardInitialZIndex + entity.id);
+            setZIndex(TableCardInitialZIndex + entity.animationChannel);
         }, delay);
-
-        const flipTimeoutId = setTimeout(() => {
-            setFlipped(isFlippedAfterFly(entity));
-            onCompleteRef.current(entity.id);
-        }, totalTime);
 
         return () => {
             clearTimeout(zIndexTimeoutId);
-            clearTimeout(flipTimeoutId);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -56,10 +50,17 @@ export function TableCard({ entity, deckPosition, onComplete }: TableCardProps) 
         transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
     }));
 
+    const handleFlipEnd = () => {
+        onFlipComplete(entity.id);
+    };
+
     return (
         <Animated.View style={[styles.cardAnchor, { zIndex }]}>
             <Animated.View style={[styles.cardMotion, animatedStyle]}>
-                <FullCard card={{ rank: entity.card.rank, suit: entity.card.suit, isFlipped }} />
+                <FullCard
+                    card={{ rank: entity.card.rank, suit: entity.card.suit, isFlipped: entity.card.isFlipped }}
+                    onFlipEnd={handleFlipEnd}
+                />
             </Animated.View>
         </Animated.View>
     );

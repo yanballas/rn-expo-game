@@ -1,51 +1,47 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useGameStore } from '@/client/store';
 import { cardStyles, colors, defaultHandSlotCount, handCardsRowGap } from '@/client/utils/constants';
 import type { CardPosition } from '@/client/utils/types';
 
 interface HandProps {
-    count: number;
+    side: 'dealer' | 'player';
     label?: string;
-    score?: number;
-    onCardLayout?: (positions: CardPosition[]) => void;
 }
 
-export function Hand({ count, label, score, onCardLayout }: HandProps) {
+export function Hand({ side, label }: HandProps) {
+    const setDealerPositions = useGameStore(store => store.setDealerPositions);
+    const setPlayerPositions = useGameStore(store => store.setPlayerPositions);
+
     const slotRefs = useRef<(View | null)[]>([]);
 
-    const slotCount = onCardLayout ? Math.max(count, defaultHandSlotCount) : count;
-    const layoutSentinelRef = useRef(false);
-
     useEffect(() => {
-        layoutSentinelRef.current = false;
-    }, [slotCount]);
-
-    useEffect(() => {
-        if (!onCardLayout || slotCount === 0 || layoutSentinelRef.current) return;
-        layoutSentinelRef.current = true;
-
         const positions: CardPosition[] = [];
         let slotsPlaceholders = 0;
 
-        for (let i = 0; i < slotCount; i++) {
+        for (let i = 0; i < defaultHandSlotCount; i++) {
             const slotRef = slotRefs.current[i];
             if (!slotRef) break;
             slotRef.measureInWindow((x: number, y: number) => {
                 positions[i] = { x, y };
                 slotsPlaceholders++;
-                if (slotsPlaceholders === slotCount) {
-                    onCardLayout(positions);
+                if (slotsPlaceholders === defaultHandSlotCount) {
+                    if (side === 'dealer') {
+                        setDealerPositions(positions);
+                    } else {
+                        setPlayerPositions(positions);
+                    }
                 }
             });
         }
-    }, [slotCount, onCardLayout]);
+    }, [side, setDealerPositions, setPlayerPositions]);
 
     return (
         <View style={styles.container}>
             {label && <Text style={styles.label}>{label}</Text>}
             <View style={styles.cardsRow}>
-                {Array.from({ length: slotCount }, (_, index) => (
+                {Array.from({ length: defaultHandSlotCount }, (_, index) => (
                     <View
                         key={`slot-${index}`}
                         ref={ref => {
@@ -55,7 +51,6 @@ export function Hand({ count, label, score, onCardLayout }: HandProps) {
                     />
                 ))}
             </View>
-            {score !== undefined && <Text style={styles.score}>{score}</Text>}
         </View>
     );
 }

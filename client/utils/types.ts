@@ -17,6 +17,7 @@ export interface AnimatedCardFace {
     children: ReactNode;
     isVisible: boolean;
     rotateY: string;
+    onFlipEnd?: () => void;
     style?: StyleProp<ViewStyle>;
 }
 
@@ -37,7 +38,7 @@ export type UniqueIdRef = RefObject<number>;
 export type Recipient = 'player' | 'dealer';
 
 export type CardEntity = {
-    id: number;
+    id: string;
     card: FullCard;
     origin: 'deal' | 'hit';
     recipient: Recipient;
@@ -51,3 +52,5 @@ export type HitRequest = {
     recipient: Recipient;
     slotIndex: number;
 };
+
+export type GamePhase = 'idle' | 'dealing' | 'playerTurn' | 'hitAnimating' | 'dealerTurn' | 'roundEnd';
