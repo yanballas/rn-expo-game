@@ -37,9 +37,11 @@ export interface BlackjackAnimationControllerParams {
     onInteractionLockedChange?: (isLocked: boolean) => void;
 }
 
-export type TableFlyResolverMap = Map<string, () => void>;
-
 export type TableOperationResult =
     | { ok: true }
     | { ok: false; reason: string }
     | { ok: false; isCancelled: true };
+
+export type TableAnimationWaitResult = TableOperationResult;
+
+export type TableAnimationResolverMap = Map<string, (result: TableAnimationWaitResult) => void>;

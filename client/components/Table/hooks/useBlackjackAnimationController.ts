@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useGameStore } from '@/client/store';
+import { animationWaitTimeoutMarginMs, deckAnimation, flipTransition } from '@/client/utils/constants';
 
 import {
     createHitVisualCard,
@@ -9,9 +10,10 @@ import {
     warnTableActionError,
 } from '../functions/visualCard.functions';
 import type {
+    TableAnimationResolverMap,
     BlackjackAnimationControllerParams,
     TableAnimationActions,
-    TableFlyResolverMap,
+    TableAnimationWaitResult,
     TableOperationResult,
     TableVisualCard,
 } from '../types/table.types';
@@ -28,6 +30,10 @@ function operationError(reason: string): TableOperationResult {
 
 function operationCancelled(): TableOperationResult {
     return { ok: false, isCancelled: true };
+}
+
+function getFlyTimeoutMs(card: TableVisualCard): number {
+    return card.sequenceIndex * deckAnimation.sequenceInterval + deckAnimation.duration + animationWaitTimeoutMarginMs;
 }
 
 function failRoundFromOperation(result: TableOperationResult) {
@@ -47,8 +53,8 @@ export function useBlackjackAnimationController({
     const operationIdRef = useRef(0);
     const visualCardsRef = useRef<TableVisualCard[]>([]);
     const isInteractionLockedRef = useRef(false);
-    const flyResolversRef = useRef<TableFlyResolverMap>(new Map());
-    const flipResolversRef = useRef<TableFlyResolverMap>(new Map());
+    const flyResolversRef = useRef<TableAnimationResolverMap>(new Map());
+    const flipResolversRef = useRef<TableAnimationResolverMap>(new Map());
 
     const [visualCards, setVisualCardsState] = useState<TableVisualCard[]>([]);
     const [isInteractionLocked, setIsInteractionLockedState] = useState(false);
@@ -70,29 +76,61 @@ export function useBlackjackAnimationController({
         [onInteractionLockedChange],
     );
 
-    const waitForFly = useCallback((cardId: string) => {
-        return new Promise<void>(resolve => {
-            flyResolversRef.current.set(cardId, resolve);
+    const waitForAnimationEnd = useCallback(({
+        cardId,
+        resolverMap,
+        timeoutMs,
+        timeoutReason,
+    }: {
+        cardId: string;
+        resolverMap: TableAnimationResolverMap;
+        timeoutMs: number;
+        timeoutReason: string;
+    }) => {
+        return new Promise<TableAnimationWaitResult>(resolve => {
+            const timeoutId = setTimeout(() => {
+                resolverMap.delete(cardId);
+                resolve(operationError(timeoutReason));
+            }, timeoutMs);
+
+            resolverMap.set(cardId, result => {
+                clearTimeout(timeoutId);
+                resolve(result);
+            });
         });
     }, []);
 
-    const waitForFlip = useCallback((cardId: string) => {
-        return new Promise<void>(resolve => {
-            flipResolversRef.current.set(cardId, resolve);
-        });
-    }, []);
+    const waitForFly = useCallback(
+        (card: TableVisualCard) => waitForAnimationEnd({
+            cardId: card.id,
+            resolverMap: flyResolversRef.current,
+            timeoutMs: getFlyTimeoutMs(card),
+            timeoutReason: 'Card fly animation did not complete in time.',
+        }),
+        [waitForAnimationEnd],
+    );
 
-    const resolveAndClear = useCallback((resolverMap: TableFlyResolverMap, cardId: string) => {
+    const waitForFlip = useCallback(
+        (cardId: string) => waitForAnimationEnd({
+            cardId,
+            resolverMap: flipResolversRef.current,
+            timeoutMs: flipTransition.duration + animationWaitTimeoutMarginMs,
+            timeoutReason: 'Card flip animation did not complete in time.',
+        }),
+        [waitForAnimationEnd],
+    );
+
+    const resolveAndClear = useCallback((resolverMap: TableAnimationResolverMap, cardId: string, result: TableAnimationWaitResult) => {
         const resolver = resolverMap.get(cardId);
         if (!resolver) return;
 
-        resolver();
         resolverMap.delete(cardId);
+        resolver(result);
     }, []);
 
     const resolveAllPendingAnimations = useCallback(() => {
-        flyResolversRef.current.forEach(resolve => resolve());
-        flipResolversRef.current.forEach(resolve => resolve());
+        flyResolversRef.current.forEach(resolve => resolve(operationCancelled()));
+        flipResolversRef.current.forEach(resolve => resolve(operationCancelled()));
         flyResolversRef.current.clear();
         flipResolversRef.current.clear();
     }, []);
@@ -118,7 +156,7 @@ export function useBlackjackAnimationController({
     );
 
     const flipCards = useCallback(
-        async (operationId: number, cardIds: string[]) => {
+        async (operationId: number, cardIds: string[]): Promise<TableOperationResult> => {
             const flipPromises = cardIds.map(cardId => waitForFlip(cardId));
             const cardIdSet = new Set(cardIds);
 
@@ -129,22 +167,28 @@ export function useBlackjackAnimationController({
                 }),
             );
 
-            await Promise.all(flipPromises);
-            return operationIdRef.current === operationId;
+            const results = await Promise.all(flipPromises);
+            const failedResult = results.find(result => !result.ok);
+            if (failedResult) return failedResult;
+            if (operationIdRef.current !== operationId) return operationCancelled();
+
+            return operationOk();
         },
         [setVisualCards, waitForFlip],
     );
 
     const addAndFlyCards = useCallback(
-        async (operationId: number, cards: TableVisualCard[]) => {
-            const flyPromises = cards.map(card => waitForFly(card.id));
+        async (operationId: number, cards: TableVisualCard[]): Promise<TableOperationResult> => {
+            const flyPromises = cards.map(card => waitForFly(card));
             setVisualCards(currentCards => [...currentCards, ...cards]);
 
-            await Promise.all(flyPromises);
-            if (operationIdRef.current !== operationId) return false;
+            const results = await Promise.all(flyPromises);
+            const failedResult = results.find(result => !result.ok);
+            if (failedResult) return failedResult;
+            if (operationIdRef.current !== operationId) return operationCancelled();
 
             settleCards(cards.map(card => card.id));
-            return true;
+            return operationOk();
         },
         [setVisualCards, settleCards, waitForFly],
     );
@@ -156,8 +200,8 @@ export function useBlackjackAnimationController({
                 return operationError('Dealer hidden visual card is missing.');
             }
 
-            const didReveal = await flipCards(operationId, [dealerHiddenCard.id]);
-            if (!didReveal) return operationCancelled();
+            const revealAnimationResult = await flipCards(operationId, [dealerHiddenCard.id]);
+            if (!revealAnimationResult.ok) return revealAnimationResult;
 
             const revealResult = useGameStore.getState().revealDealerHiddenCard();
             if (!revealResult.ok) {
@@ -181,11 +225,11 @@ export function useBlackjackAnimationController({
                     return operationError('Dealer hit target layout is missing.');
                 }
 
-                const didFly = await addAndFlyCards(operationId, [visualCard]);
-                if (!didFly) return operationCancelled();
+                const flyResult = await addAndFlyCards(operationId, [visualCard]);
+                if (!flyResult.ok) return flyResult;
 
-                const didFlip = await flipCards(operationId, [visualCard.id]);
-                if (!didFlip) return operationCancelled();
+                const flipResult = await flipCards(operationId, [visualCard.id]);
+                if (!flipResult.ok) return flipResult;
 
                 const commitResult = useGameStore.getState().commitHit(reservation.value);
                 if (!commitResult.ok) {
@@ -241,11 +285,17 @@ export function useBlackjackAnimationController({
                 return;
             }
 
-            const didFly = await addAndFlyCards(operationId, cards);
-            if (!didFly) return;
+            const flyResult = await addAndFlyCards(operationId, cards);
+            if (!flyResult.ok) {
+                failRoundFromOperation(flyResult);
+                return;
+            }
 
-            const didFlip = await flipCards(operationId, getInitialDealFaceUpCardIds(cards));
-            if (!didFlip) return;
+            const flipResult = await flipCards(operationId, getInitialDealFaceUpCardIds(cards));
+            if (!flipResult.ok) {
+                failRoundFromOperation(flipResult);
+                return;
+            }
 
             const commitResult = useGameStore.getState().commitInitialDeal(reservation.value);
             if (!commitResult.ok) {
@@ -276,11 +326,17 @@ export function useBlackjackAnimationController({
                 return;
             }
 
-            const didFly = await addAndFlyCards(operationId, [visualCard]);
-            if (!didFly) return;
+            const flyResult = await addAndFlyCards(operationId, [visualCard]);
+            if (!flyResult.ok) {
+                failRoundFromOperation(flyResult);
+                return;
+            }
 
-            const didFlip = await flipCards(operationId, [visualCard.id]);
-            if (!didFlip) return;
+            const flipResult = await flipCards(operationId, [visualCard.id]);
+            if (!flipResult.ok) {
+                failRoundFromOperation(flipResult);
+                return;
+            }
 
             const commitResult = useGameStore.getState().commitHit(reservation.value);
             if (!commitResult.ok) {
@@ -329,14 +385,14 @@ export function useBlackjackAnimationController({
 
     const handleFlyEnd = useCallback(
         (cardId: string) => {
-            resolveAndClear(flyResolversRef.current, cardId);
+            resolveAndClear(flyResolversRef.current, cardId, operationOk());
         },
         [resolveAndClear],
     );
 
     const handleFlipEnd = useCallback(
         (cardId: string) => {
-            resolveAndClear(flipResolversRef.current, cardId);
+            resolveAndClear(flipResolversRef.current, cardId, operationOk());
         },
         [resolveAndClear],
     );

@@ -15,6 +15,8 @@ export const flipTransition = {
     duration: 800,
 };
 
+export const animationWaitTimeoutMarginMs = 2000;
+
 export const defaultHandSlotCount = 2;
 
 export const handCardsRowGap = 12;
