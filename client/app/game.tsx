@@ -17,6 +17,7 @@ export default function GameScreen() {
     const tableRef = useRef<TableHandle>(null);
     const [isInteractionLocked, setIsInteractionLocked] = useState(false);
     const phase = useGameStore(store => store.phase);
+    const roundError = useGameStore(store => store.roundError);
     const playerScore = useGameStore(store => store.playerScore);
     const dealerScore = useGameStore(store => store.dealerScore);
 
@@ -29,6 +30,11 @@ export default function GameScreen() {
         tableRef.current?.resetTable();
         useGameStore.getState().resetGame();
         router.push({ pathname: '/menu' });
+    };
+
+    const handleResetRound = () => {
+        tableRef.current?.resetTable();
+        useGameStore.getState().resetGame();
     };
 
     return (
@@ -87,7 +93,20 @@ export default function GameScreen() {
                     </Pressable>
                 )}
 
-                {(phase === 'idle' || phase === 'roundEnd') && (
+                {phase === 'roundError' && (
+                    <>
+                        <Text style={styles.errorText}>{roundError}</Text>
+                        <Pressable
+                            style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                            disabled={isInteractionLocked}
+                            onPress={handleResetRound}
+                        >
+                            <Text style={styles.buttonText}>Сбросить</Text>
+                        </Pressable>
+                    </>
+                )}
+
+                {(phase === 'idle' || phase === 'roundEnd' || phase === 'roundError') && (
                     <Pressable
                         style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
                         disabled={isInteractionLocked}
@@ -172,5 +191,13 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    errorText: {
+        alignSelf: 'center',
+        maxWidth: 240,
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
     },
 });

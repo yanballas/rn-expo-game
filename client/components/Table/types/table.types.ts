@@ -38,3 +38,8 @@ export interface BlackjackAnimationControllerParams {
 }
 
 export type TableFlyResolverMap = Map<string, () => void>;
+
+export type TableOperationResult =
+    | { ok: true }
+    | { ok: false; reason: string }
+    | { ok: false; isCancelled: true };

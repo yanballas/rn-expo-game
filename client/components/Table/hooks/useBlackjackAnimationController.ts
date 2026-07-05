@@ -8,8 +8,32 @@ import {
     getInitialDealFaceUpCardIds,
     warnTableActionError,
 } from '../functions/visualCard.functions';
-import type { BlackjackAnimationControllerParams, TableAnimationActions, TableFlyResolverMap, TableVisualCard } from '../types/table.types';
+import type {
+    BlackjackAnimationControllerParams,
+    TableAnimationActions,
+    TableFlyResolverMap,
+    TableOperationResult,
+    TableVisualCard,
+} from '../types/table.types';
 import { getInitialLayoutError } from './useTableLayout';
+
+function operationOk(): TableOperationResult {
+    return { ok: true };
+}
+
+function operationError(reason: string): TableOperationResult {
+    warnTableActionError(reason);
+    return { ok: false, reason };
+}
+
+function operationCancelled(): TableOperationResult {
+    return { ok: false, isCancelled: true };
+}
+
+function failRoundFromOperation(result: TableOperationResult) {
+    if (result.ok || 'isCancelled' in result) return;
+    useGameStore.getState().failRound(result.reason);
+}
 
 export function useBlackjackAnimationController({
     layoutRef,
@@ -126,62 +150,55 @@ export function useBlackjackAnimationController({
     );
 
     const runDealerSequence = useCallback(
-        async (operationId: number) => {
+        async (operationId: number): Promise<TableOperationResult> => {
             const dealerHiddenCard = visualCardsRef.current.find(card => card.recipient === 'dealer' && card.slotIndex === 1);
             if (!dealerHiddenCard) {
-                warnTableActionError('Dealer hidden visual card is missing.');
-                return false;
+                return operationError('Dealer hidden visual card is missing.');
             }
 
             const didReveal = await flipCards(operationId, [dealerHiddenCard.id]);
-            if (!didReveal) return false;
+            if (!didReveal) return operationCancelled();
 
             const revealResult = useGameStore.getState().revealDealerHiddenCard();
             if (!revealResult.ok) {
-                warnTableActionError(revealResult.reason);
-                return false;
+                return operationError(revealResult.reason);
             }
 
             while (useGameStore.getState().dealerScore < 17) {
                 const layoutSnapshot = layoutRef.current;
                 const layoutError = getInitialLayoutError(layoutSnapshot);
                 if (layoutError) {
-                    warnTableActionError(layoutError);
-                    return false;
+                    return operationError(layoutError);
                 }
 
                 const reservation = useGameStore.getState().reserveHit('dealer');
                 if (!reservation.ok) {
-                    warnTableActionError(reservation.reason);
-                    return false;
+                    return operationError(reservation.reason);
                 }
 
                 const visualCard = createHitVisualCard(reservation.value, layoutSnapshot);
                 if (!visualCard) {
-                    warnTableActionError('Dealer hit target layout is missing.');
-                    return false;
+                    return operationError('Dealer hit target layout is missing.');
                 }
 
                 const didFly = await addAndFlyCards(operationId, [visualCard]);
-                if (!didFly) return false;
+                if (!didFly) return operationCancelled();
 
                 const didFlip = await flipCards(operationId, [visualCard.id]);
-                if (!didFlip) return false;
+                if (!didFlip) return operationCancelled();
 
                 const commitResult = useGameStore.getState().commitHit(reservation.value);
                 if (!commitResult.ok) {
-                    warnTableActionError(commitResult.reason);
-                    return false;
+                    return operationError(commitResult.reason);
                 }
             }
 
             const finishResult = useGameStore.getState().finishDealerTurn();
             if (!finishResult.ok) {
-                warnTableActionError(finishResult.reason);
-                return false;
+                return operationError(finishResult.reason);
             }
 
-            return true;
+            return operationOk();
         },
         [addAndFlyCards, flipCards, layoutRef],
     );
@@ -233,6 +250,7 @@ export function useBlackjackAnimationController({
             const commitResult = useGameStore.getState().commitInitialDeal(reservation.value);
             if (!commitResult.ok) {
                 warnTableActionError(commitResult.reason);
+                useGameStore.getState().failRound(commitResult.reason);
             }
         });
     }, [addAndFlyCards, flipCards, layoutRef, runExclusiveOperation]);
@@ -267,11 +285,13 @@ export function useBlackjackAnimationController({
             const commitResult = useGameStore.getState().commitHit(reservation.value);
             if (!commitResult.ok) {
                 warnTableActionError(commitResult.reason);
+                useGameStore.getState().failRound(commitResult.reason);
                 return;
             }
 
             if (commitResult.value.isBust) {
-                await runDealerSequence(operationId);
+                const dealerSequenceResult = await runDealerSequence(operationId);
+                failRoundFromOperation(dealerSequenceResult);
             }
         });
     }, [addAndFlyCards, flipCards, layoutRef, runDealerSequence, runExclusiveOperation]);
@@ -284,7 +304,8 @@ export function useBlackjackAnimationController({
                 return;
             }
 
-            await runDealerSequence(operationId);
+            const dealerSequenceResult = await runDealerSequence(operationId);
+            failRoundFromOperation(dealerSequenceResult);
         });
     }, [runDealerSequence, runExclusiveOperation]);
 

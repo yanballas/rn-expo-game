@@ -16,6 +16,7 @@ import type {
 
 interface GameStore {
     phase: GamePhase;
+    roundError: string | null;
     playerHand: FullCard[];
     dealerHand: FullCard[];
     playerScore: number;
@@ -29,6 +30,7 @@ interface GameStore {
     startDealerTurn: () => ActionResult<null>;
     revealDealerHiddenCard: () => ActionResult<null>;
     finishDealerTurn: () => ActionResult<null>;
+    failRound: (reason: string) => void;
     newRound: () => ActionResult<null>;
     resetGame: () => void;
 }
@@ -45,12 +47,22 @@ function withFlipped(card: FrontCard, isFlipped: boolean): FullCard {
     return { ...card, isFlipped };
 }
 
+function areSameCards(left: FrontCard, right: FrontCard): boolean {
+    return left.rank === right.rank && left.suit === right.suit;
+}
+
+function doCardsMatch(cards: FrontCard[], expectedCards: FrontCard[]): boolean {
+    if (cards.length < expectedCards.length) return false;
+    return expectedCards.every((expectedCard, index) => areSameCards(cards[index], expectedCard));
+}
+
 export const useGameStore = create<GameStore>()((set, get) => {
     const initialPool = buildDeck();
     logDeckRemaining(initialPool);
 
     return {
         phase: 'idle',
+        roundError: null,
         playerHand: [],
         dealerHand: [],
         playerScore: 0,
@@ -64,7 +76,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
             const cardsToPick = defaultHandSlotCount * 2;
             if (pool.length < cardsToPick) return actionError('Not enough cards for initial deal.');
 
-            const { pickedCards, remainingCards } = takeCardsFromPool(pool, cardsToPick);
+            const { pickedCards } = takeCardsFromPool(pool, cardsToPick);
             const dealerCards = pickedCards.slice(0, defaultHandSlotCount);
             const playerCards = pickedCards.slice(defaultHandSlotCount);
 
@@ -72,26 +84,32 @@ export const useGameStore = create<GameStore>()((set, get) => {
                 return actionError('Initial deal reservation produced an invalid card count.');
             }
 
-            set({ pool: remainingCards });
-            logDeckRemaining(remainingCards);
-
             return actionOk({ dealerCards, playerCards });
         },
 
         commitInitialDeal: reservation => {
-            const { phase } = get();
+            const { phase, pool } = get();
             if (phase !== 'idle') return actionError(`Initial deal commit is not allowed during "${phase}" phase.`);
 
+            const reservedCards = [...reservation.dealerCards, ...reservation.playerCards];
+            if (!doCardsMatch(pool, reservedCards)) {
+                return actionError('Initial deal reservation no longer matches the deck.');
+            }
+
+            const remainingCards = pool.slice(reservedCards.length);
             const dealerHand = reservation.dealerCards.map((card, index) => withFlipped(card, index === 0));
             const playerHand = reservation.playerCards.map(card => withFlipped(card, true));
 
             set({
+                pool: remainingCards,
                 dealerHand,
                 playerHand,
                 dealerScore: calculateScore(dealerHand),
                 playerScore: calculateScore(playerHand),
                 phase: 'playerTurn',
+                roundError: null,
             });
+            logDeckRemaining(remainingCards);
 
             return actionOk(null);
         },
@@ -104,26 +122,34 @@ export const useGameStore = create<GameStore>()((set, get) => {
             if (phase !== expectedPhase) return actionError(`${recipient} hit is not allowed during "${phase}" phase.`);
             if (pool.length === 0) return actionError('Deck is empty.');
 
-            const { pickedCards, remainingCards } = takeCardsFromPool(pool, 1);
+            const { pickedCards } = takeCardsFromPool(pool, 1);
             const card = pickedCards[0];
             if (!card) return actionError('Hit reservation did not produce a card.');
 
             const slotIndex = isPlayerHit ? playerHand.length : dealerHand.length;
 
-            set({ pool: remainingCards });
-            logDeckRemaining(remainingCards);
-
             return actionOk({ recipient, card, slotIndex });
         },
 
         commitHit: reservation => {
-            const { phase, playerHand, dealerHand } = get();
+            const { phase, pool, playerHand, dealerHand } = get();
             const expectedPhase = reservation.recipient === 'player' ? 'playerTurn' : 'dealerTurn';
 
             if (phase !== expectedPhase) {
                 return actionError(`${reservation.recipient} hit commit is not allowed during "${phase}" phase.`);
             }
 
+            const reservedCard = pool[0];
+            if (!reservedCard || !areSameCards(reservedCard, reservation.card)) {
+                return actionError(`${reservation.recipient} hit reservation no longer matches the deck.`);
+            }
+
+            const currentHand = reservation.recipient === 'player' ? playerHand : dealerHand;
+            if (reservation.slotIndex !== currentHand.length) {
+                return actionError(`${reservation.recipient} hit reservation no longer matches the hand slot.`);
+            }
+
+            const remainingCards = pool.slice(1);
             const nextCard = withFlipped(reservation.card, true);
             const nextHand = reservation.recipient === 'player' ? [...playerHand, nextCard] : [...dealerHand, nextCard];
             const nextScore = calculateScore(nextHand);
@@ -131,16 +157,21 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
             if (reservation.recipient === 'player') {
                 set({
+                    pool: remainingCards,
                     playerHand: nextHand,
                     playerScore: nextScore,
                     phase: isBust ? 'dealerTurn' : 'playerTurn',
+                    roundError: null,
                 });
             } else {
                 set({
+                    pool: remainingCards,
                     dealerHand: nextHand,
                     dealerScore: nextScore,
+                    roundError: null,
                 });
             }
+            logDeckRemaining(remainingCards);
 
             return actionOk({ isBust });
         },
@@ -149,7 +180,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
             const { phase } = get();
             if (phase !== 'playerTurn') return actionError(`Dealer turn cannot start during "${phase}" phase.`);
 
-            set({ phase: 'dealerTurn' });
+            set({ phase: 'dealerTurn', roundError: null });
             return actionOk(null);
         },
 
@@ -166,6 +197,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
             set({
                 dealerHand: nextDealerHand,
                 dealerScore: calculateScore(nextDealerHand),
+                roundError: null,
             });
 
             return actionOk(null);
@@ -175,8 +207,15 @@ export const useGameStore = create<GameStore>()((set, get) => {
             const { phase } = get();
             if (phase !== 'dealerTurn') return actionError(`Dealer turn cannot finish during "${phase}" phase.`);
 
-            set({ phase: 'roundEnd' });
+            set({ phase: 'roundEnd', roundError: null });
             return actionOk(null);
+        },
+
+        failRound: reason => {
+            set({
+                phase: 'roundError',
+                roundError: reason,
+            });
         },
 
         newRound: () => {
@@ -187,6 +226,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
             set({
                 phase: 'idle',
+                roundError: null,
                 playerHand: [],
                 dealerHand: [],
                 playerScore: 0,
@@ -206,6 +246,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
             set({
                 phase: 'idle',
+                roundError: null,
                 playerHand: [],
                 dealerHand: [],
                 playerScore: 0,

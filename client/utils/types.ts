@@ -64,4 +64,4 @@ export type CardLayout = {
     playerSlots: CardPosition[];
 };
 
-export type GamePhase = 'idle' | 'playerTurn' | 'dealerTurn' | 'roundEnd';
+export type GamePhase = 'idle' | 'playerTurn' | 'dealerTurn' | 'roundEnd' | 'roundError';
