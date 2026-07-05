@@ -1,5 +1,5 @@
 import { cardStyles, handCardsRowGap } from '@/client/utils/constants';
-import type { CardEntity, CardPosition, FrontCard } from '@/client/utils/types';
+import type { CardPosition, FrontCard } from '@/client/utils/types';
 import { cardRanks, cardSuits } from '@utils/constants';
 
 export function buildDeck(): FrontCard[] {
@@ -49,10 +49,4 @@ export function resolveSlotPosition(positions: CardPosition[], slotIndex: number
         x: positions[iLast].x + deltaX * steps,
         y: positions[iLast].y + deltaY * steps,
     };
-}
-
-export function isFlippedAfterFly(entity: CardEntity): boolean {
-    if (entity.origin === 'hit') return true;
-    if (entity.recipient === 'player') return true;
-    return entity.slotIndex === 0;
 }

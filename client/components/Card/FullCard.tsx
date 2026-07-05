@@ -68,7 +68,6 @@ export function FullCard({
             <AnimatedCardFace
                 isVisible={!isFlipped}
                 rotateY={isFlipped ? rotatePositions.back.start : rotatePositions.back.end}
-                onFlipEnd={onFlipEnd}
                 style={styles.cardBack}
             >
                 <BackCard />

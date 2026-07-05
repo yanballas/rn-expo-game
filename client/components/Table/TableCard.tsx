@@ -3,63 +3,75 @@ import { StyleSheet } from 'react-native';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { FullCard } from '@/client/components/Card/FullCard';
-import { useGameStore } from '@/client/store';
-import { cardStyles, deckAnimation, deckCardOriginInset, TableCardInitialZIndex } from '@/client/utils/constants';
-import { onFlipComplete, onFlyComplete } from '@/client/utils/functions';
-import type { CardEntity } from '@/client/utils/types';
+import { cardStyles, deckAnimation, TableCardInitialZIndex } from '@/client/utils/constants';
+import type { CardPosition } from '@/client/utils/types';
+
+import type { TableVisualCard } from './types/table.types';
 
 const { duration, sequenceInterval, easingBezier } = deckAnimation;
 const easing = Easing.bezier(easingBezier[0], easingBezier[1], easingBezier[2], easingBezier[3]);
 
 interface TableCardProps {
-    entity: CardEntity;
+    visualCard: TableVisualCard;
+    currentPosition: CardPosition;
+    onFlyEnd: (cardId: string) => void;
+    onFlipEnd: (cardId: string) => void;
 }
 
-export function TableCard({ entity }: TableCardProps) {
-    const deckPosition = useGameStore(store => store.deckPosition);
-    const deltaX = entity.targetPosition.x - deckPosition.x;
-    const deltaY = entity.targetPosition.y - deckPosition.y;
+export function TableCard({ visualCard, currentPosition, onFlyEnd, onFlipEnd }: TableCardProps) {
+    const deltaX = visualCard.targetPosition.x - visualCard.startPosition.x;
+    const deltaY = visualCard.targetPosition.y - visualCard.startPosition.y;
 
-    const translateX = useSharedValue(deckCardOriginInset);
-    const translateY = useSharedValue(deckCardOriginInset);
+    const translateX = useSharedValue(0);
+    const translateY = useSharedValue(0);
 
-    const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - entity.animationChannel);
+    const [zIndex, setZIndex] = useState(() => TableCardInitialZIndex - visualCard.sequenceIndex);
 
     useEffect(() => {
-        const delay = entity.animationChannel * sequenceInterval;
-        const flyDuration = duration;
+        if (visualCard.layoutMode === 'settled') return;
 
-        translateX.value = withDelay(delay, withTiming(deltaX, { duration: flyDuration, easing }, finished => {
+        const delay = visualCard.sequenceIndex * sequenceInterval;
+
+        translateX.value = withDelay(delay, withTiming(deltaX, { duration, easing }, finished => {
             if (finished === true) {
-                runOnJS(onFlyComplete)(entity.id);
+                runOnJS(onFlyEnd)(visualCard.id);
             }
         }));
-        translateY.value = withDelay(delay, withTiming(deltaY, { duration: flyDuration, easing }));
+        translateY.value = withDelay(delay, withTiming(deltaY, { duration, easing }));
 
         const zIndexTimeoutId = setTimeout(() => {
-            setZIndex(TableCardInitialZIndex + entity.animationChannel);
+            setZIndex(TableCardInitialZIndex + visualCard.sequenceIndex);
         }, delay);
 
         return () => {
             clearTimeout(zIndexTimeoutId);
         };
+        // The flight intentionally uses the start/target snapshot from the visual card creation moment.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
-    }));
+    const animatedStyle = useAnimatedStyle(() => {
+        if (visualCard.layoutMode === 'settled') {
+            return {
+                transform: [{ translateX: 0 }, { translateY: 0 }],
+            };
+        }
 
-    const handleFlipEnd = () => {
-        onFlipComplete(entity.id);
-    };
+        return {
+            transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
+        };
+    }, [visualCard.layoutMode]);
 
     return (
-        <Animated.View style={[styles.cardAnchor, { zIndex }]}>
+        <Animated.View style={[styles.cardAnchor, { left: currentPosition.x, top: currentPosition.y, zIndex }]}>
             <Animated.View style={[styles.cardMotion, animatedStyle]}>
                 <FullCard
-                    card={{ rank: entity.card.rank, suit: entity.card.suit, isFlipped: entity.card.isFlipped }}
-                    onFlipEnd={handleFlipEnd}
+                    card={{
+                        rank: visualCard.card.rank,
+                        suit: visualCard.card.suit,
+                        isFlipped: visualCard.card.isFlipped,
+                    }}
+                    onFlipEnd={() => onFlipEnd(visualCard.id)}
                 />
             </Animated.View>
         </Animated.View>
@@ -69,8 +81,6 @@ export function TableCard({ entity }: TableCardProps) {
 const styles = StyleSheet.create({
     cardAnchor: {
         position: 'absolute',
-        left: 0,
-        top: 0,
         width: cardStyles.width,
         height: cardStyles.height,
     },

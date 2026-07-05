@@ -1,25 +1,47 @@
-import { useRef } from 'react';
+import { forwardRef, useImperativeHandle } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BackCard } from '@/client/components/Card/BackCard';
-import { useGameStore } from '@/client/store';
-import { cardStyles, deckCardOriginInset, deckPosition, deckStackOffset } from '@/client/utils/constants';
+import {
+    bottomAreaPosition,
+    cardStyles,
+    deckCardOriginInset,
+    deckPosition,
+    deckStackOffset,
+    defaultHandSlotCount,
+    handCardsRowGap,
+    topAreaPosition,
+} from '@/client/utils/constants';
 
+import { useBlackjackAnimationController } from './hooks/useBlackjackAnimationController';
+import { resolveCardPosition, useTableLayout } from './hooks/useTableLayout';
 import { TableCard } from './TableCard';
+import type { TableHandle } from './types/table.types';
 
-export function Table() {
-    const deckRef = useRef<View>(null);
-    const entities = useGameStore(store => store.entities);
+export type { TableHandle } from './types/table.types';
 
-    const handleDeckLayout = () => {
-        deckRef.current?.measureInWindow((x: number, y: number) => {
-            useGameStore.getState().setDeckPosition({ x, y });
-        });
-    };
+interface TableProps {
+    onInteractionLockedChange?: (isLocked: boolean) => void;
+}
+
+export const Table = forwardRef<TableHandle, TableProps>(function Table({ onInteractionLockedChange }, ref) {
+    const tableLayout = useTableLayout();
+    const animationController = useBlackjackAnimationController({
+        layoutRef: tableLayout.layoutRef,
+        onInteractionLockedChange,
+    });
+
+    useImperativeHandle(ref, () => ({
+        dealInitialCards: animationController.dealInitialCards,
+        hitPlayer: animationController.hitPlayer,
+        stand: animationController.stand,
+        newRound: animationController.newRound,
+        resetTable: animationController.resetTable,
+    }), [animationController]);
 
     return (
-        <View style={styles.wrapper}>
-            <View ref={deckRef} style={styles.tableAnchor} onLayout={handleDeckLayout}>
+        <View ref={tableLayout.refs.wrapperRef} style={styles.wrapper} onLayout={tableLayout.measureLayout}>
+            <View ref={tableLayout.refs.deckRef} style={styles.tableAnchor} onLayout={tableLayout.measureLayout}>
                 <View style={[styles.stackCard, styles.stackCard1]}>
                     <BackCard />
                 </View>
@@ -29,13 +51,57 @@ export function Table() {
                 <View style={[styles.stackCard, styles.stackCard3]}>
                     <BackCard />
                 </View>
-                {entities.map(entity => (
-                    <TableCard key={entity.id} entity={entity} />
+            </View>
+
+            <View style={styles.dealerSlots}>
+                {Array.from({ length: defaultHandSlotCount }, (_, index) => (
+                    <View
+                        key={`dealer-slot-${index}`}
+                        ref={slotRef => {
+                            tableLayout.refs.dealerSlotRefs.current[index] = slotRef;
+                        }}
+                        style={styles.cardSlot}
+                        onLayout={tableLayout.measureLayout}
+                    />
                 ))}
             </View>
+
+            <View style={styles.playerSlots}>
+                {Array.from({ length: defaultHandSlotCount }, (_, index) => (
+                    <View
+                        key={`player-slot-${index}`}
+                        ref={slotRef => {
+                            tableLayout.refs.playerSlotRefs.current[index] = slotRef;
+                        }}
+                        style={styles.cardSlot}
+                        onLayout={tableLayout.measureLayout}
+                    />
+                ))}
+            </View>
+
+            {animationController.visualCards.map(visualCard => {
+                const targetPosition = resolveCardPosition(
+                    tableLayout.layout,
+                    visualCard.recipient,
+                    visualCard.slotIndex,
+                );
+                const currentPosition = visualCard.layoutMode === 'settled' && targetPosition
+                    ? targetPosition
+                    : visualCard.startPosition;
+
+                return (
+                    <TableCard
+                        key={visualCard.id}
+                        visualCard={visualCard}
+                        currentPosition={currentPosition}
+                        onFlyEnd={animationController.handleFlyEnd}
+                        onFlipEnd={animationController.handleFlipEnd}
+                    />
+                );
+            })}
         </View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     wrapper: {
@@ -76,5 +142,27 @@ const styles = StyleSheet.create({
         top: deckCardOriginInset,
         left: deckCardOriginInset,
         zIndex: 3,
+    },
+    dealerSlots: {
+        position: 'absolute',
+        top: topAreaPosition.top,
+        left: topAreaPosition.left,
+        right: topAreaPosition.right,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: handCardsRowGap,
+    },
+    playerSlots: {
+        position: 'absolute',
+        bottom: bottomAreaPosition.bottom,
+        left: bottomAreaPosition.left,
+        right: bottomAreaPosition.right,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: handCardsRowGap,
+    },
+    cardSlot: {
+        width: cardStyles.width,
+        height: cardStyles.height,
     },
 });

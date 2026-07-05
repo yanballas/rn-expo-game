@@ -1,21 +1,18 @@
 import { create } from 'zustand';
 
-import { buildDeck, resolveSlotPosition, takeCardsFromPool } from '@/client/components/Table/helpers.functions';
-import { deckAnimation, defaultHandSlotCount } from '@/client/utils/constants';
-import {
-    calculateScore,
-    cancelRunningAnimation,
-    generateId,
-    notifyNextDealerCard,
-    runAsync,
-    waitForFlip,
-    waitForFly,
-    waitForNextDealerCard,
-} from '@/client/utils/functions';
-import { logDeckRemaining, logEntitiesCleared, logGameReset } from '@/client/utils/logger';
-import type { CardEntity, CardPosition, FrontCard, FullCard, GamePhase, Recipient } from '@/client/utils/types';
-
-const { flyingCardCount } = deckAnimation;
+import { buildDeck, takeCardsFromPool } from '@/client/components/Table/functions/helpers.functions';
+import { defaultHandSlotCount } from '@/client/utils/constants';
+import { calculateScore } from '@/client/utils/functions';
+import { logDeckRemaining, logGameReset } from '@/client/utils/logger';
+import type {
+    ActionResult,
+    FrontCard,
+    FullCard,
+    GamePhase,
+    InitialDealReservation,
+    Recipient,
+    SingleCardReservation,
+} from '@/client/utils/types';
 
 interface GameStore {
     phase: GamePhase;
@@ -23,84 +20,32 @@ interface GameStore {
     dealerHand: FullCard[];
     playerScore: number;
     dealerScore: number;
-    entities: CardEntity[];
     pool: FrontCard[];
-    dealerPositions: CardPosition[];
-    playerPositions: CardPosition[];
-    deckPosition: CardPosition;
 
-    startDeal: () => void;
-    requestCard: (recipient: Recipient) => void;
-    stand: () => void;
-    showDealerHiddenCard: () => void;
-    endDealerTurn: () => void;
-    newRound: () => void;
-
+    reserveInitialDeal: () => ActionResult<InitialDealReservation>;
+    commitInitialDeal: (reservation: InitialDealReservation) => ActionResult<null>;
+    reserveHit: (recipient: Recipient) => ActionResult<SingleCardReservation>;
+    commitHit: (reservation: SingleCardReservation) => ActionResult<{ isBust: boolean }>;
+    startDealerTurn: () => ActionResult<null>;
+    revealDealerHiddenCard: () => ActionResult<null>;
+    finishDealerTurn: () => ActionResult<null>;
+    newRound: () => ActionResult<null>;
     resetGame: () => void;
-    setDealerPositions: (positions: CardPosition[]) => void;
-    setPlayerPositions: (positions: CardPosition[]) => void;
-    setDeckPosition: (position: CardPosition) => void;
+}
+
+function actionError(reason: string): ActionResult<never> {
+    return { ok: false, reason };
+}
+
+function actionOk<T>(value: T): ActionResult<T> {
+    return { ok: true, value };
+}
+
+function withFlipped(card: FrontCard, isFlipped: boolean): FullCard {
+    return { ...card, isFlipped };
 }
 
 export const useGameStore = create<GameStore>()((set, get) => {
-    async function landCards(flyIds: string[], flipIds: string[], expectedPhase: GamePhase): Promise<CardEntity[] | null> {
-        await Promise.all(flyIds.map(id => waitForFly(id)));
-
-        const { phase: afterFlyPhase, entities: afterFlyEntities } = get();
-        if (afterFlyPhase !== expectedPhase) return null;
-
-        const flipIdSet = new Set(flipIds);
-        const updatedEntities = afterFlyEntities.map(entity => {
-            if (flipIdSet.has(entity.id)) {
-                return { ...entity, card: { ...entity.card, isFlipped: true } };
-            }
-            return entity;
-        });
-        set({ entities: updatedEntities });
-
-        const { entities: flipEntities } = get();
-        const presentFlipIds = flipIds.filter(id => flipEntities.some(e => e.id === id));
-        if (presentFlipIds.length > 0) {
-            await Promise.all(presentFlipIds.map(id => waitForFlip(id)));
-        }
-
-        const { phase: afterFlipPhase, entities: afterFlipEntities } = get();
-        if (afterFlipPhase !== expectedPhase) return null;
-
-        return afterFlipEntities;
-    }
-
-    async function runDealerTurnAsync() {
-        const state = get();
-        if (!state) return;
-        const { phase: dealerPhase, entities: dealerEntities, showDealerHiddenCard, endDealerTurn, requestCard: reqCard } = state;
-        if (dealerPhase !== 'dealerTurn') return;
-
-        try {
-            showDealerHiddenCard();
-
-            const holeCard = dealerEntities.find(entity => entity.recipient === 'dealer' && entity.slotIndex === 1);
-            if (holeCard) {
-                await waitForFlip(holeCard.id);
-            }
-
-            while (true) {
-                const { phase: holePhase, dealerScore } = get();
-                if (holePhase !== 'dealerTurn') return;
-
-                if (dealerScore >= 17) {
-                    endDealerTurn();
-                    return;
-                }
-                reqCard('dealer');
-                await waitForNextDealerCard();
-            }
-        } catch (error) {
-            console.error('[Dealer Turn Error]', error);
-            throw error;
-        }
-    }
-
     const initialPool = buildDeck();
     logDeckRemaining(initialPool);
 
@@ -110,213 +55,153 @@ export const useGameStore = create<GameStore>()((set, get) => {
         dealerHand: [],
         playerScore: 0,
         dealerScore: 0,
-        entities: [],
         pool: initialPool,
-        dealerPositions: [],
-        playerPositions: [],
-        deckPosition: { x: 0, y: 0 },
 
-        startDeal: () => {
-            const { phase, entities, pool, dealerPositions, playerPositions } = get();
-            if (phase !== 'idle') return;
+        reserveInitialDeal: () => {
+            const { phase, pool } = get();
+            if (phase !== 'idle') return actionError(`Initial deal is not allowed during "${phase}" phase.`);
 
-            if (entities.length > 0) logEntitiesCleared();
+            const cardsToPick = defaultHandSlotCount * 2;
+            if (pool.length < cardsToPick) return actionError('Not enough cards for initial deal.');
 
-            const { pickedCards, remainingCards } = takeCardsFromPool(pool, flyingCardCount);
-
+            const { pickedCards, remainingCards } = takeCardsFromPool(pool, cardsToPick);
             const dealerCards = pickedCards.slice(0, defaultHandSlotCount);
             const playerCards = pickedCards.slice(defaultHandSlotCount);
 
-            const dealerEntities: CardEntity[] = [];
-            for (let index = 0; index < dealerCards.length; index++) {
-                const card = dealerCards[index];
-                if (!card) return;
-
-                const targetPosition = resolveSlotPosition(dealerPositions, index);
-                if (!targetPosition) return;
-
-                dealerEntities.push({
-                    id: generateId(),
-                    card: { ...card, isFlipped: false },
-                    origin: 'deal',
-                    recipient: 'dealer',
-                    slotIndex: index,
-                    targetPosition,
-                    animationChannel: index,
-                });
+            if (dealerCards.length !== defaultHandSlotCount || playerCards.length !== defaultHandSlotCount) {
+                return actionError('Initial deal reservation produced an invalid card count.');
             }
 
-            const playerEntities: CardEntity[] = [];
-            for (let index = 0; index < playerCards.length; index++) {
-                const card = playerCards[index];
-                if (!card) return;
-
-                const targetPosition = resolveSlotPosition(playerPositions, index);
-                if (!targetPosition) return;
-
-                playerEntities.push({
-                    id: generateId(),
-                    card: { ...card, isFlipped: false },
-                    origin: 'deal',
-                    recipient: 'player',
-                    slotIndex: index,
-                    targetPosition,
-                    animationChannel: index + defaultHandSlotCount,
-                });
-            }
-
-            const newEntities = [...dealerEntities, ...playerEntities];
-
-            set({ entities: newEntities, pool: remainingCards, phase: 'dealing' });
-
+            set({ pool: remainingCards });
             logDeckRemaining(remainingCards);
 
-            cancelRunningAnimation();
-
-            runAsync(async () => {
-                try {
-                    const { phase: dealingPhase } = get();
-                    if (dealingPhase !== 'dealing') return;
-
-                    const flyIds = newEntities.map(entity => entity.id);
-                    const flipIds = newEntities
-                        .filter(entity => entity.recipient === 'player' || (entity.recipient === 'dealer' && entity.slotIndex === 0))
-                        .map(entity => entity.id);
-
-                    const afterFlipEntities = await landCards(flyIds, flipIds, 'dealing');
-                    if (!afterFlipEntities) return;
-
-                    set({
-                        dealerHand: afterFlipEntities.filter(entity => entity.recipient === 'dealer').map(entity => ({ ...entity.card })),
-                        playerHand: afterFlipEntities.filter(entity => entity.recipient === 'player').map(entity => ({ ...entity.card })),
-                        dealerScore: calculateScore(
-                            afterFlipEntities.filter(entity => entity.recipient === 'dealer').map(entity => ({ ...entity.card })),
-                        ),
-                        playerScore: calculateScore(
-                            afterFlipEntities.filter(entity => entity.recipient === 'player').map(entity => ({ ...entity.card })),
-                        ),
-                        phase: 'playerTurn',
-                    });
-                } catch (error) {
-                    console.error('[Start Deal Error]', error);
-                }
-            });
+            return actionOk({ dealerCards, playerCards });
         },
 
-        requestCard: (recipient: Recipient) => {
-            const { phase, playerHand, dealerHand, playerPositions, dealerPositions, pool } = get();
+        commitInitialDeal: reservation => {
+            const { phase } = get();
+            if (phase !== 'idle') return actionError(`Initial deal commit is not allowed during "${phase}" phase.`);
 
-            if (recipient === 'player' && phase !== 'playerTurn') return;
-            if (recipient === 'dealer' && phase !== 'dealerTurn') return;
-            if (pool.length === 0) return;
+            const dealerHand = reservation.dealerCards.map((card, index) => withFlipped(card, index === 0));
+            const playerHand = reservation.playerCards.map(card => withFlipped(card, true));
 
-            const hand = recipient === 'player' ? playerHand : dealerHand;
-            const positions = recipient === 'player' ? playerPositions : dealerPositions;
-            const nextPhase = recipient === 'player' ? 'hitAnimating' : 'dealerTurn';
+            set({
+                dealerHand,
+                playerHand,
+                dealerScore: calculateScore(dealerHand),
+                playerScore: calculateScore(playerHand),
+                phase: 'playerTurn',
+            });
 
-            const slotIndex = hand.length;
+            return actionOk(null);
+        },
 
-            const target = resolveSlotPosition(positions, slotIndex);
-            if (!target) return;
+        reserveHit: recipient => {
+            const { phase, pool, playerHand, dealerHand } = get();
+            const isPlayerHit = recipient === 'player';
+            const expectedPhase = isPlayerHit ? 'playerTurn' : 'dealerTurn';
+
+            if (phase !== expectedPhase) return actionError(`${recipient} hit is not allowed during "${phase}" phase.`);
+            if (pool.length === 0) return actionError('Deck is empty.');
 
             const { pickedCards, remainingCards } = takeCardsFromPool(pool, 1);
             const card = pickedCards[0];
-            if (!card) return;
+            if (!card) return actionError('Hit reservation did not produce a card.');
 
-            const entity: CardEntity = {
-                id: generateId(),
-                card: { ...card, isFlipped: false },
-                origin: 'hit',
-                recipient,
-                slotIndex,
-                targetPosition: target,
-                animationChannel: 0,
-            };
+            const slotIndex = isPlayerHit ? playerHand.length : dealerHand.length;
 
-            const { entities: currentEntities } = get();
-            set({ entities: [...currentEntities, entity], pool: remainingCards, phase: nextPhase });
+            set({ pool: remainingCards });
+            logDeckRemaining(remainingCards);
 
-            runAsync(async () => {
-                try {
-                    const afterFlipEntities = await landCards([entity.id], [entity.id], nextPhase);
-                    if (!afterFlipEntities) return;
-
-                    logEntitiesCleared();
-
-                    const hand = afterFlipEntities.filter(e => e.recipient === recipient).map(e => ({ ...e.card }));
-                    const newScore = calculateScore(hand);
-
-                    if (recipient === 'player') {
-                        if (newScore > 21) {
-                            set({ playerHand: hand, playerScore: newScore, phase: 'dealerTurn' });
-                            runAsync(runDealerTurnAsync);
-                        } else {
-                            set({ playerHand: hand, playerScore: newScore, phase: 'playerTurn' });
-                        }
-                    } else {
-                        set({ dealerHand: hand, dealerScore: newScore });
-                        logDeckRemaining(remainingCards);
-                        notifyNextDealerCard();
-                    }
-                } catch (error) {
-                    console.error(`[Request Card Error] ${recipient}:`, error);
-                }
-            });
+            return actionOk({ recipient, card, slotIndex });
         },
 
-        stand: () => {
+        commitHit: reservation => {
+            const { phase, playerHand, dealerHand } = get();
+            const expectedPhase = reservation.recipient === 'player' ? 'playerTurn' : 'dealerTurn';
+
+            if (phase !== expectedPhase) {
+                return actionError(`${reservation.recipient} hit commit is not allowed during "${phase}" phase.`);
+            }
+
+            const nextCard = withFlipped(reservation.card, true);
+            const nextHand = reservation.recipient === 'player' ? [...playerHand, nextCard] : [...dealerHand, nextCard];
+            const nextScore = calculateScore(nextHand);
+            const isBust = nextScore > 21;
+
+            if (reservation.recipient === 'player') {
+                set({
+                    playerHand: nextHand,
+                    playerScore: nextScore,
+                    phase: isBust ? 'dealerTurn' : 'playerTurn',
+                });
+            } else {
+                set({
+                    dealerHand: nextHand,
+                    dealerScore: nextScore,
+                });
+            }
+
+            return actionOk({ isBust });
+        },
+
+        startDealerTurn: () => {
             const { phase } = get();
-            if (phase !== 'playerTurn') return;
+            if (phase !== 'playerTurn') return actionError(`Dealer turn cannot start during "${phase}" phase.`);
+
             set({ phase: 'dealerTurn' });
-            runAsync(runDealerTurnAsync);
+            return actionOk(null);
         },
 
-        showDealerHiddenCard: () => {
-            const { dealerHand, entities } = get();
+        revealDealerHiddenCard: () => {
+            const { phase, dealerHand } = get();
+            if (phase !== 'dealerTurn') return actionError(`Dealer hidden card cannot reveal during "${phase}" phase.`);
+            if (dealerHand.length < defaultHandSlotCount) return actionError('Dealer hidden card is missing.');
 
-            const updatedDealerHand = dealerHand.map((dealerCard, cardIndex) => {
-                const isDealerSecondCard = cardIndex === 1;
-                if (!isDealerSecondCard) return dealerCard;
-                return { ...dealerCard, isFlipped: true };
+            const nextDealerHand = dealerHand.map((card, index) => {
+                if (index !== 1) return card;
+                return { ...card, isFlipped: true };
             });
 
-            const updatedEntities = entities.map(cardEntity => {
-                const shouldFlipDealerSecondCard = cardEntity.recipient === 'dealer' && cardEntity.slotIndex === 1;
-                if (!shouldFlipDealerSecondCard) return cardEntity;
-                return { ...cardEntity, card: { ...cardEntity.card, isFlipped: true } };
+            set({
+                dealerHand: nextDealerHand,
+                dealerScore: calculateScore(nextDealerHand),
             });
 
-            set({ dealerHand: updatedDealerHand, entities: updatedEntities });
+            return actionOk(null);
         },
 
-        endDealerTurn: () => {
+        finishDealerTurn: () => {
+            const { phase } = get();
+            if (phase !== 'dealerTurn') return actionError(`Dealer turn cannot finish during "${phase}" phase.`);
+
             set({ phase: 'roundEnd' });
+            return actionOk(null);
         },
 
         newRound: () => {
-            const { phase, entities } = get();
-            if (phase !== 'roundEnd') return;
+            const { phase } = get();
+            if (phase !== 'roundEnd') return actionError(`New round is not allowed during "${phase}" phase.`);
 
             const newPool = buildDeck();
-            cancelRunningAnimation();
-
-            if (entities.length > 0) logEntitiesCleared();
 
             set({
+                phase: 'idle',
                 playerHand: [],
                 dealerHand: [],
                 playerScore: 0,
                 dealerScore: 0,
-                entities: [],
                 pool: newPool,
-                phase: 'idle',
             });
 
             logDeckRemaining(newPool);
+
+            return actionOk(null);
         },
 
         resetGame: () => {
-            cancelRunningAnimation();
+            const newPool = buildDeck();
+
             logGameReset();
 
             set({
@@ -325,16 +210,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
                 dealerHand: [],
                 playerScore: 0,
                 dealerScore: 0,
-                entities: [],
-                pool: buildDeck(),
-                dealerPositions: [],
-                playerPositions: [],
-                deckPosition: { x: 0, y: 0 },
+                pool: newPool,
             });
-        },
 
-        setDealerPositions: (positions: CardPosition[]) => set({ dealerPositions: positions }),
-        setPlayerPositions: (positions: CardPosition[]) => set({ playerPositions: positions }),
-        setDeckPosition: (position: CardPosition) => set({ deckPosition: position }),
+            logDeckRemaining(newPool);
+        },
     };
 });

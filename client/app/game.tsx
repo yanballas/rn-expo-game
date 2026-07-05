@@ -1,13 +1,12 @@
-import { useEffect } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Background } from '@/client/components/Background';
-import { Hand } from '@/client/components/Hand';
-import { Table } from '@/client/components/Table/Table';
+import { Table, type TableHandle } from '@/client/components/Table/Table';
 import { useGameStore } from '@/client/store';
-import { bottomAreaPosition, colors, topAreaPosition } from '@/client/utils/constants';
+import { bottomAreaPosition, cardStyles, colors, handCardsRowGap, topAreaPosition } from '@/client/utils/constants';
 
 import bgItemsPng from '@/client/assets/images/background/bg_items.png';
 import bgMainPng from '@/client/assets/images/background/bg_main.png';
@@ -15,13 +14,22 @@ import bgPatternPng from '@/client/assets/images/background/bg_pattern.png';
 
 export default function GameScreen() {
     const router = useRouter();
+    const tableRef = useRef<TableHandle>(null);
+    const [isInteractionLocked, setIsInteractionLocked] = useState(false);
     const phase = useGameStore(store => store.phase);
     const playerScore = useGameStore(store => store.playerScore);
     const dealerScore = useGameStore(store => store.dealerScore);
 
     useEffect(() => {
         useGameStore.getState().resetGame();
+        tableRef.current?.resetTable();
     }, []);
+
+    const handleBackToMenu = () => {
+        tableRef.current?.resetTable();
+        useGameStore.getState().resetGame();
+        router.push({ pathname: '/menu' });
+    };
 
     return (
         <View style={styles.container}>
@@ -30,46 +38,61 @@ export default function GameScreen() {
             <Image source={bgPatternPng} style={styles.backgroundImagePattern} contentFit="contain" />
 
             <View style={[styles.topArea]}>
-                <Hand side="dealer" />
                 <Text style={styles.scoreTop}>{dealerScore}</Text>
             </View>
 
             <View style={[styles.bottomArea]}>
-                <Hand side="player" />
                 <Text style={styles.scoreBottom}>{playerScore}</Text>
             </View>
 
-            <Table />
+            <Table ref={tableRef} onInteractionLockedChange={setIsInteractionLocked} />
 
             <View style={styles.buttonRow}>
                 {phase === 'idle' && (
-                    <Pressable style={styles.button} onPress={() => useGameStore.getState().startDeal()}>
+                    <Pressable
+                        style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                        disabled={isInteractionLocked}
+                        onPress={() => tableRef.current?.dealInitialCards()}
+                    >
                         <Text style={styles.buttonText}>Раздать</Text>
                     </Pressable>
                 )}
 
                 {phase === 'playerTurn' && (
                     <>
-                        <Pressable style={styles.button} onPress={() => useGameStore.getState().requestCard('player')}>
+                        <Pressable
+                            style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                            disabled={isInteractionLocked}
+                            onPress={() => tableRef.current?.hitPlayer()}
+                        >
                             <Text style={styles.buttonText}>Ещё</Text>
                         </Pressable>
-                        <Pressable style={styles.button} onPress={() => useGameStore.getState().stand()}>
+                        <Pressable
+                            style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                            disabled={isInteractionLocked}
+                            onPress={() => tableRef.current?.stand()}
+                        >
                             <Text style={styles.buttonText}>Стоять</Text>
                         </Pressable>
                     </>
                 )}
 
                 {phase === 'roundEnd' && (
-                    <Pressable style={styles.button} onPress={() => useGameStore.getState().newRound()}>
+                    <Pressable
+                        style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                        disabled={isInteractionLocked}
+                        onPress={() => tableRef.current?.newRound()}
+                    >
                         <Text style={styles.buttonText}>Новая раздача</Text>
                     </Pressable>
                 )}
 
                 {(phase === 'idle' || phase === 'roundEnd') && (
-                    <Pressable style={styles.button} onPress={() => {
-                        useGameStore.getState().resetGame();
-                        router.push({ pathname: '/menu' });
-                    }}>
+                    <Pressable
+                        style={[styles.button, isInteractionLocked && styles.buttonDisabled]}
+                        disabled={isInteractionLocked}
+                        onPress={handleBackToMenu}
+                    >
                         <Text style={styles.buttonText}>Назад в меню</Text>
                     </Pressable>
                 )}
@@ -96,16 +119,20 @@ const styles = StyleSheet.create({
     topArea: {
         position: 'absolute',
         alignItems: 'center',
+        width: cardStyles.width * 2 + handCardsRowGap,
+        height: cardStyles.height,
         top: topAreaPosition.top,
-        left: topAreaPosition.left,
-        right: topAreaPosition.right,
+        left: '50%',
+        transform: [{ translateX: '-50%' }],
     },
     bottomArea: {
         position: 'absolute',
         alignItems: 'center',
+        width: cardStyles.width * 2 + handCardsRowGap,
+        height: cardStyles.height,
         bottom: bottomAreaPosition.bottom,
-        left: bottomAreaPosition.left,
-        right: bottomAreaPosition.right,
+        left: '50%',
+        transform: [{ translateX: '-50%' }],
     },
     buttonRow: {
         position: 'absolute',
@@ -137,6 +164,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 12,
         backgroundColor: '#1f2937',
+    },
+    buttonDisabled: {
+        opacity: 0.55,
     },
     buttonText: {
         color: '#ffffff',
